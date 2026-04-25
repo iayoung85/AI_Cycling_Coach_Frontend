@@ -1,0 +1,259 @@
+/* ── List View Page ──────────────────────────────────────── */
+.lv-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+}
+
+/* ── Header + Filters ────────────────────────────────────── */
+.lv-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xl);
+  flex-wrap: wrap;
+}
+
+.lv-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.lv-filters {
+  display: flex;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+}
+
+.lv-filter-btn {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-text-muted);
+  padding: 0.25rem 0.875rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.lv-filter-btn:hover:not(.active) {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+}
+
+.lv-filter-btn.active {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+/* ── Weeks ───────────────────────────────────────────────── */
+.lv-weeks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+}
+
+.lv-week {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.lv-week-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: var(--space-sm);
+}
+
+.lv-week-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text);
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-md);
+}
+
+.lv-week-range {
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.lv-week-block {
+  font-size: 0.6875rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ── Day group ───────────────────────────────────────────── */
+.lv-day {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding-left: var(--space-md);
+}
+
+.lv-day-heading {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: var(--space-xs);
+}
+
+.lv-day-entries {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+/* ── Entry card ──────────────────────────────────────────── */
+.lv-entry {
+  border-left: 3px solid var(--color-border);
+  background: var(--color-surface);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  overflow: hidden;
+}
+
+.lv-entry-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: 0;
+  color: var(--color-text);
+  font-size: 0.9375rem;
+}
+
+.lv-entry-header:not(:disabled):hover {
+  background: var(--color-surface-hover);
+}
+
+.lv-entry-header:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.lv-entry-time {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  min-width: 3.25rem;
+  flex-shrink: 0;
+}
+
+.lv-category-pill {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.lv-entry-title {
+  flex: 1;
+  font-weight: 500;
+}
+
+.lv-chevron {
+  font-size: 0.5rem;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+/* ── Entry body ──────────────────────────────────────────── */
+.lv-entry-body {
+  padding: var(--space-sm) var(--space-md) var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  border-top: 1px solid var(--color-border);
+}
+
+.lv-description {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.lv-workout-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  align-items: center;
+}
+
+.lv-chip {
+  font-size: 0.75rem;
+  background: var(--color-surface-hover);
+  color: var(--color-text-muted);
+  padding: 0.125rem 0.625rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+}
+
+.lv-workout-note {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  width: 100%;
+  margin-top: var(--space-xs);
+  white-space: pre-wrap;
+}
+
+.lv-athlete-note {
+  margin: 0;
+  background: rgba(59, 130, 246, 0.06);
+  border-left: 2px solid var(--color-primary);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding: var(--space-sm) var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.lv-note-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+
+.lv-athlete-note p {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  white-space: pre-wrap;
+}
+
+/* ── Rest day ────────────────────────────────────────────── */
+.lv-rest {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+}
+
+/* ── States ──────────────────────────────────────────────── */
+.lv-state {
+  padding: var(--space-xl);
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.lv-state--error {
+  color: var(--color-danger);
+}

@@ -21,6 +21,11 @@ export default function AppLayout({ children }: Props) {
             </NavLink>
           </li>
           <li>
+            <NavLink to="/list">
+              📋 List
+            </NavLink>
+          </li>
+          <li>
             <NavLink to="/recurring">
               🔁 Recurring
             </NavLink>
