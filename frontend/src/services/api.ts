@@ -1,0 +1,158 @@
+import type { UserEventPayload, UserEventResponse } from '../types';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000';
+
+let authToken: string | null = localStorage.getItem('auth_token');
+
+/** Update the stored auth token */
+export function setAuthToken(token: string) {
+  authToken = token;
+  localStorage.setItem('auth_token', token);
+}
+
+/** Clear the stored auth token */
+export function clearAuthToken() {
+  authToken = null;
+  localStorage.removeItem('auth_token');
+}
+
+/** Fetch wrapper that includes auth token and handles token refresh */
+async function apiFetch(endpoint: string, options: RequestInit = {}) {
+  const url = `${API_URL}${endpoint}`;
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string>),
+  };
+
+  if (authToken) {
+    headers.Authorization = `Bearer ${authToken}`;
+  }
+
+  let response = await fetch(url, { ...options, headers });
+
+  // If 401, try to refresh token
+  if (response.status === 401) {
+    try {
+      const refreshResponse = await fetch(`${API_URL}/api/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include', // Send refresh token in httpOnly cookie
+      });
+
+      if (refreshResponse.ok) {
+        const data = await refreshResponse.json();
+        setAuthToken(data.access_token);
+
+        // Retry original request with new token
+        headers.Authorization = `Bearer ${data.access_token}`;
+        response = await fetch(url, { ...options, headers });
+      }
+    } catch (err) {
+      console.error('Token refresh failed:', err);
+      clearAuthToken();
+    }
+  }
+
+  return response;
+}
+
+/** Fetch all plan files from backend */
+export async function fetchAllPlans(): Promise<Array<{ filename: string; content: string }>> {
+  const response = await apiFetch('/api/plans');
+  if (!response.ok) throw new Error(`Failed to fetch plans: ${response.status}`);
+  const data = await response.json();
+  return data.plans || [];
+}
+
+/** Submit athlete notes for a specific date */
+export async function submitAthleteNote(
+  date: string,
+  note?: string,
+  metadata?: { actual_duration?: number; freshness?: number; difficulty?: number; rpe?: number; stats?: string }
+): Promise<{ success: boolean; message: string; note_content?: string }> {
+  const body: Record<string, unknown> = {
+    user_id: 1, // TODO: get from auth context
+  };
+  
+  // Only include athlete_notes if provided
+  if (note !== undefined && note !== null) {
+    body.athlete_notes = note;
+  }
+  
+  if (metadata) {
+    Object.assign(body, metadata);
+  }
+
+  const res = await apiFetch(`/api/plans/${date}/notes`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.error || `Failed to submit note: ${res.status}`);
+  }
+
+  const data = await res.json();
+  return { success: true, message: data.message || 'Note submitted', note_content: data.note_content };
+}
+
+/** Create a new user event (Life, Work, or Workout) for a specific date */
+export async function createEvent(date: string, payload: UserEventPayload): Promise<UserEventResponse> {
+  const res = await apiFetch(`/api/plans/${date}/events`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.error || `Failed to create event: ${res.status}`);
+  }
+  return res.json();
+}
+
+/** Update an existing user event */
+export async function updateEvent(
+  date: string,
+  eventId: string,
+  payload: Partial<UserEventPayload>
+): Promise<UserEventResponse> {
+  const res = await apiFetch(`/api/plans/${date}/events/${eventId}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.error || `Failed to update event: ${res.status}`);
+  }
+  return res.json();
+}
+
+/** Delete a user event */
+export async function deleteEvent(date: string, eventId: string): Promise<void> {
+  const res = await apiFetch(`/api/plans/${date}/events/${eventId}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.error || `Failed to delete event: ${res.status}`);
+  }
+}
+
+/** Reschedule a coach-written entry to a new day/time within the same week */
+export async function rescheduleCoachEntry(
+  date: string,
+  time: string,
+  category: string,
+  title: string,
+  newDate: string,
+  newTime: string,
+): Promise<{ date: string; time: string; category: string; title: string }> {
+  const res = await apiFetch(`/api/plans/${date}/reschedule-entry`, {
+    method: 'PUT',
+    body: JSON.stringify({ time, category, title, new_date: newDate, new_time: newTime }),
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.error || `Failed to reschedule entry: ${res.status}`);
+  }
+  return res.json();
+}
