@@ -96,12 +96,39 @@ export async function submitAthleteNote(
   return { success: true, message: data.message || 'Note submitted', note_content: data.note_content };
 }
 
+/** Generate a skeleton week file for the week containing the given date */
+async function generateWeek(date: string): Promise<void> {
+  const res = await apiFetch('/api/plans/generate-week', {
+    method: 'POST',
+    body: JSON.stringify({ user_id: 1, date }),
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.error || `Failed to generate week: ${res.status}`);
+  }
+}
+
 /** Create a new user event (Life, Work, or Workout) for a specific date */
 export async function createEvent(date: string, payload: UserEventPayload): Promise<UserEventResponse> {
   const res = await apiFetch(`/api/plans/${date}/events`, {
     method: 'POST',
     body: JSON.stringify(payload),
   });
+
+  // If the week file doesn't exist yet, auto-generate it and retry once
+  if (res.status === 404) {
+    await generateWeek(date);
+    const retry = await apiFetch(`/api/plans/${date}/events`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    if (!retry.ok) {
+      const error = await retry.json().catch(() => ({}));
+      throw new Error(error.error || `Failed to create event: ${retry.status}`);
+    }
+    return retry.json();
+  }
+
   if (!res.ok) {
     const error = await res.json().catch(() => ({}));
     throw new Error(error.error || `Failed to create event: ${res.status}`);

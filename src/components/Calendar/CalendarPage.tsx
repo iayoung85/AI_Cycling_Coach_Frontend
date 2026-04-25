@@ -219,22 +219,31 @@ export default function CalendarPage() {
   const handleCreateEvent = async (payload: UserEventPayload) => {
     if (eventModal?.mode !== 'create') return;
     const { date } = eventModal;
+    const monday = getMondayOf(date);
+    const weekExists = weeks.some(w => w.meta.week_start === monday);
+
     const result = await createEvent(date, payload);
-    const newEntry: PlanEntry = {
-      eventId: result.event_id,
-      time: result.time,
-      category: result.category as Category,
-      title: result.title,
-      description: result.notes ?? '',
-      workoutYaml: (result.workout_details as WorkoutDetails) ?? undefined,
-      athleteNotes: [],
-      date,
-    };
-    setWeeks(prev => prev.map(week =>
-      week.meta.week_start === getMondayOf(date)
-        ? { ...week, entries: [...week.entries, newEntry] }
-        : week
-    ));
+
+    if (!weekExists) {
+      // Week was auto-generated — reload all plans so the new week appears
+      await loadPlans();
+    } else {
+      const newEntry: PlanEntry = {
+        eventId: result.event_id,
+        time: result.time,
+        category: result.category as Category,
+        title: result.title,
+        description: result.notes ?? '',
+        workoutYaml: (result.workout_details as WorkoutDetails) ?? undefined,
+        athleteNotes: [],
+        date,
+      };
+      setWeeks(prev => prev.map(week =>
+        week.meta.week_start === monday
+          ? { ...week, entries: [...week.entries, newEntry] }
+          : week
+      ));
+    }
     setEventModal(null);
   };
 
