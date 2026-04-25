@@ -1,0 +1,330 @@
+.recurring-page {
+  max-width: 860px;
+}
+
+.recurring-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-xl);
+}
+
+.recurring-header h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: var(--space-xs);
+}
+
+.recurring-subtitle {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  max-width: 500px;
+}
+
+.recurring-error {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid var(--color-danger);
+  color: var(--color-danger);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-md);
+  font-size: 0.875rem;
+}
+
+.recurring-loading,
+.recurring-empty {
+  color: var(--color-text-muted);
+  text-align: center;
+  padding: var(--space-xl);
+  font-size: 0.9375rem;
+}
+
+/* ── Rules list ── */
+
+.rules-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.rule-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+/* ── Rule summary row ── */
+
+.rule-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+}
+
+.rule-summary-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+.rule-category-badge {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #0f172a;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.rule-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rule-title {
+  font-weight: 600;
+  font-size: 0.9375rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rule-meta {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.rule-next {
+  font-size: 0.75rem;
+  color: var(--color-primary);
+}
+
+.rule-actions {
+  display: flex;
+  gap: var(--space-sm);
+  flex-shrink: 0;
+}
+
+/* ── Delete confirm ── */
+
+.rule-delete-confirm {
+  padding: var(--space-md) var(--space-lg);
+}
+
+.rule-delete-confirm p {
+  font-size: 0.9375rem;
+  margin-bottom: var(--space-md);
+  color: var(--color-text-muted);
+}
+
+.rule-delete-confirm strong {
+  color: var(--color-text);
+}
+
+/* ── Edit form ── */
+
+.rule-edit-form {
+  padding: var(--space-lg);
+  border-top: 2px solid var(--color-primary);
+}
+
+.rule-edit-form h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: var(--space-md);
+}
+
+.edit-mode-selector {
+  margin-bottom: var(--space-md);
+}
+
+.edit-mode-selector > label {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  display: block;
+  margin-bottom: var(--space-xs);
+}
+
+.edit-mode-options {
+  display: flex;
+  gap: var(--space-lg);
+}
+
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+/* ── Create form card ── */
+
+.rule-form-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  margin-bottom: var(--space-lg);
+}
+
+.rule-form-card h3 {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  margin-bottom: var(--space-md);
+}
+
+/* ── Form fields ── */
+
+.form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.form-row {
+  display: flex;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.form-row label,
+.label-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  flex: 1;
+  min-width: 140px;
+  position: relative;
+}
+
+.form-row input[type="text"],
+.form-row input[type="time"],
+.form-row input[type="date"],
+.form-row input[type="number"],
+.form-row select,
+.label-block textarea,
+.label-block input {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: 0.875rem;
+  padding: var(--space-sm) var(--space-md);
+  outline: none;
+  transition: border-color 0.15s;
+  width: 100%;
+}
+
+.form-row input:focus,
+.form-row select:focus,
+.label-block textarea:focus {
+  border-color: var(--color-primary);
+}
+
+.label-block textarea {
+  resize: vertical;
+}
+
+.input-suffix {
+  position: absolute;
+  right: var(--space-sm);
+  bottom: var(--space-sm);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.optional {
+  font-weight: 400;
+  opacity: 0.6;
+}
+
+/* ── Day-of-week pills ── */
+
+.byday-pills {
+  display: flex;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+  margin-top: var(--space-xs);
+}
+
+.byday-pill {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 4px 10px;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.byday-pill.active {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.byday-pill:hover:not(.active) {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+}
+
+/* ── Form actions ── */
+
+.form-actions {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--color-border);
+}
+
+.form-error {
+  color: var(--color-danger);
+  font-size: 0.8125rem;
+  margin-top: var(--space-sm);
+}
+
+/* ── Ghost / small button variants ── */
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+}
+
+.btn-sm {
+  padding: 4px 12px;
+  font-size: 0.8125rem;
+}
+
+.btn-danger-ghost {
+  border-color: rgba(239, 68, 68, 0.4);
+  color: var(--color-danger);
+}
+
+.btn-danger-ghost:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--color-danger);
+}

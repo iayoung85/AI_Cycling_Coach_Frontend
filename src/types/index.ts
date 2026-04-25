@@ -58,3 +58,59 @@ export interface PlanWeek {
   filename: string;
   entries: PlanEntry[];
 }
+
+// Recurring event rule (stored in plans/recurring.json)
+export interface RecurrenceException {
+  original_date: string;
+  deleted: boolean;
+  time?: string;
+  title?: string;
+  notes?: string;
+  workout_details?: Partial<WorkoutDetails>;
+}
+
+export interface RecurrenceRule {
+  id: string;
+  freq: 'daily' | 'weekly' | 'monthly';
+  interval: number;
+  byday: string[];          // e.g. ["MO", "WE", "FR"]
+  bymonthday: number | null;
+  start_date: string;       // YYYY-MM-DD
+  until: string | null;     // YYYY-MM-DD
+  time: string;             // HH:MM
+  category: UserEventCategory;
+  title: string;
+  notes: string | null;
+  workout_details: Partial<WorkoutDetails> | null;
+  exceptions: RecurrenceException[];
+  created_at: string;
+}
+
+// Payload for creating a recurring rule
+export interface RecurrenceRulePayload {
+  freq: 'daily' | 'weekly' | 'monthly';
+  interval?: number;
+  byday?: string[];
+  bymonthday?: number;
+  start_date: string;
+  until?: string;
+  time: string;
+  category: UserEventCategory;
+  title: string;
+  notes?: string;
+  workout_details?: Partial<WorkoutDetails>;
+}
+
+// Payload for updating a recurring rule
+export interface RecurrenceUpdatePayload {
+  edit_mode: 'all' | 'this_and_future' | 'this_only';
+  target_date?: string;
+  freq?: 'daily' | 'weekly' | 'monthly';
+  interval?: number;
+  byday?: string[];
+  bymonthday?: number;
+  until?: string;
+  time?: string;
+  title?: string;
+  notes?: string;
+}

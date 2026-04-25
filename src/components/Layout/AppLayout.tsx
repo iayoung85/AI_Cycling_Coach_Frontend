@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { NavLink } from 'react-router-dom';
 import './AppLayout.css';
 
 interface Props {
@@ -13,6 +14,18 @@ export default function AppLayout({ children }: Props) {
           <span className="brand-icon">🚴</span>
           <h1>CycleCoach</h1>
         </div>
+        <ul className="nav-links">
+          <li>
+            <NavLink to="/" end>
+              📅 Calendar
+            </NavLink>
+          </li>
+          <li>
+            <NavLink to="/recurring">
+              🔁 Recurring
+            </NavLink>
+          </li>
+        </ul>
         <div className="sidebar-footer">
           <p>AI Cycling Coach</p>
           <p className="version">v2.0.0</p>

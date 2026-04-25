@@ -1,4 +1,4 @@
-import type { UserEventPayload, UserEventResponse } from '../types';
+import type { UserEventPayload, UserEventResponse, RecurrenceRule, RecurrenceRulePayload, RecurrenceUpdatePayload } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000';
 
@@ -181,5 +181,67 @@ export async function rescheduleCoachEntry(
     const error = await res.json().catch(() => ({}));
     throw new Error(error.error || `Failed to reschedule entry: ${res.status}`);
   }
+  return res.json();
+}
+
+// ---------------------------------------------------------------------------
+// Recurring rules
+// ---------------------------------------------------------------------------
+
+/** Fetch all recurring rules */
+export async function fetchRecurringRules(): Promise<RecurrenceRule[]> {
+  const res = await apiFetch('/api/recurring');
+  if (!res.ok) throw new Error(`Failed to fetch recurring rules: ${res.status}`);
+  const data = await res.json();
+  return data.rules || [];
+}
+
+/** Create a new recurring rule (materializes ~6 months of events) */
+export async function createRecurringRule(
+  payload: RecurrenceRulePayload,
+): Promise<{ rule: RecurrenceRule; materialized: number }> {
+  const res = await apiFetch('/api/recurring', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.error || `Failed to create recurring rule: ${res.status}`);
+  }
+  return res.json();
+}
+
+/** Update a recurring rule */
+export async function updateRecurringRule(
+  ruleId: string,
+  payload: RecurrenceUpdatePayload,
+): Promise<{ rule: RecurrenceRule }> {
+  const res = await apiFetch(`/api/recurring/${ruleId}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.error || `Failed to update recurring rule: ${res.status}`);
+  }
+  return res.json();
+}
+
+/** Delete a recurring rule and remove all its materialized instances */
+export async function deleteRecurringRule(
+  ruleId: string,
+): Promise<{ success: boolean; instances_removed: number }> {
+  const res = await apiFetch(`/api/recurring/${ruleId}`, { method: 'DELETE' });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.error || `Failed to delete recurring rule: ${res.status}`);
+  }
+  return res.json();
+}
+
+/** Trigger idempotent re-materialization of all rules across the next ~6 months */
+export async function expandRecurringRules(): Promise<{ rules_processed: number; instances_materialized: number }> {
+  const res = await apiFetch('/api/recurring/expand', { method: 'POST' });
+  if (!res.ok) throw new Error(`Failed to expand recurring rules: ${res.status}`);
   return res.json();
 }
