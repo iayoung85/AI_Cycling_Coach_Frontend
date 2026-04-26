@@ -1,8 +1,56 @@
-import type { UserEventPayload, UserEventResponse, RecurrenceRule, RecurrenceRulePayload, RecurrenceUpdatePayload } from '../types';
+import type {
+  AuthSession,
+  AuthUser,
+  UserEventPayload,
+  UserEventResponse,
+  RecurrenceRule,
+  RecurrenceRulePayload,
+  RecurrenceUpdatePayload,
+} from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000';
+const AUTH_TOKEN_KEY = 'auth_token';
+const AUTH_USER_KEY = 'auth_user';
+const LOCAL_API_HOSTS = new Set(['127.0.0.1', 'localhost', '::1']);
 
-let authToken: string | null = localStorage.getItem('auth_token');
+function readStoredAuthUser(): AuthUser | null {
+  const rawUser = localStorage.getItem(AUTH_USER_KEY);
+
+  if (!rawUser) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(rawUser) as AuthUser;
+  } catch {
+    localStorage.removeItem(AUTH_USER_KEY);
+    return null;
+  }
+}
+
+let authToken: string | null = localStorage.getItem(AUTH_TOKEN_KEY);
+let authUser: AuthUser | null = readStoredAuthUser();
+let authFailureHandler: (() => void) | null = null;
+
+export function isLocalApiTarget(): boolean {
+  try {
+    return LOCAL_API_HOSTS.has(new URL(API_URL).hostname);
+  } catch {
+    return API_URL.includes('127.0.0.1') || API_URL.includes('localhost');
+  }
+}
+
+export function hasStoredAuthToken(): boolean {
+  return Boolean(authToken);
+}
+
+export function getStoredAuthUser(): AuthUser | null {
+  return authUser;
+}
+
+export function setAuthFailureHandler(handler: (() => void) | null) {
+  authFailureHandler = handler;
+}
 
 function getMondayOf(date: string): string {
   const [year, month, day] = date.split('-').map(Number);
@@ -56,15 +104,82 @@ async function ensureWeeksExistForEvent(date: string, payload: Partial<UserEvent
 }
 
 /** Update the stored auth token */
-export function setAuthToken(token: string) {
+function setAuthSession(token: string, user: AuthUser) {
   authToken = token;
-  localStorage.setItem('auth_token', token);
+  authUser = user;
+  localStorage.setItem(AUTH_TOKEN_KEY, token);
+  localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
 }
 
-/** Clear the stored auth token */
-export function clearAuthToken() {
+/** Clear the stored auth token and user */
+export function clearAuthSession() {
   authToken = null;
-  localStorage.removeItem('auth_token');
+  authUser = null;
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  localStorage.removeItem(AUTH_USER_KEY);
+}
+
+async function refreshAuthSession(): Promise<AuthSession | null> {
+  try {
+    const refreshResponse = await fetch(`${API_URL}/api/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include',
+    });
+
+    if (!refreshResponse.ok) {
+      clearAuthSession();
+      authFailureHandler?.();
+      return null;
+    }
+
+    const data = (await refreshResponse.json()) as AuthSession;
+    setAuthSession(data.access_token, data.user);
+    return data;
+  } catch (err) {
+    console.error('Token refresh failed:', err);
+    clearAuthSession();
+    authFailureHandler?.();
+    return null;
+  }
+}
+
+export async function restoreAuthSession(): Promise<AuthSession | null> {
+  if (isLocalApiTarget()) {
+    return null;
+  }
+
+  return refreshAuthSession();
+}
+
+export async function loginWithPassword(password: string): Promise<AuthSession> {
+  const response = await fetch(`${API_URL}/api/auth/login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include',
+    body: JSON.stringify({ password }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || `Failed to sign in: ${response.status}`);
+  }
+
+  const data = (await response.json()) as AuthSession;
+  setAuthSession(data.access_token, data.user);
+  return data;
+}
+
+export async function logoutSession(): Promise<void> {
+  try {
+    await fetch(`${API_URL}/api/auth/logout`, {
+      method: 'POST',
+      credentials: 'include',
+    });
+  } finally {
+    clearAuthSession();
+  }
 }
 
 /** Fetch wrapper that includes auth token and handles token refresh */
@@ -74,6 +189,7 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
   };
+  let refreshedSession = false;
 
   if (authToken) {
     headers.Authorization = `Bearer ${authToken}`;
@@ -82,25 +198,19 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
   let response = await fetch(url, { ...options, headers });
 
   // If 401, try to refresh token
-  if (response.status === 401) {
-    try {
-      const refreshResponse = await fetch(`${API_URL}/api/auth/refresh`, {
-        method: 'POST',
-        credentials: 'include', // Send refresh token in httpOnly cookie
-      });
+  if (response.status === 401 && !isLocalApiTarget()) {
+    const data = await refreshAuthSession();
 
-      if (refreshResponse.ok) {
-        const data = await refreshResponse.json();
-        setAuthToken(data.access_token);
-
-        // Retry original request with new token
-        headers.Authorization = `Bearer ${data.access_token}`;
+    if (data) {
+      refreshedSession = true;
+      headers.Authorization = `Bearer ${data.access_token}`;
         response = await fetch(url, { ...options, headers });
-      }
-    } catch (err) {
-      console.error('Token refresh failed:', err);
-      clearAuthToken();
     }
+  }
+
+  if (response.status === 401 && !isLocalApiTarget() && refreshedSession) {
+    clearAuthSession();
+    authFailureHandler?.();
   }
 
   return response;
@@ -120,9 +230,7 @@ export async function submitAthleteNote(
   note?: string,
   metadata?: { actual_duration?: number; freshness?: number; difficulty?: number; rpe?: number; stats?: string }
 ): Promise<{ success: boolean; message: string; note_content?: string }> {
-  const body: Record<string, unknown> = {
-    user_id: 1, // TODO: get from auth context
-  };
+  const body: Record<string, unknown> = {};
   
   // Only include athlete_notes if provided
   if (note !== undefined && note !== null) {
@@ -151,7 +259,7 @@ export async function submitAthleteNote(
 async function generateWeek(date: string): Promise<void> {
   const res = await apiFetch('/api/plans/generate-week', {
     method: 'POST',
-    body: JSON.stringify({ user_id: 1, date }),
+    body: JSON.stringify({ date }),
   });
   if (!res.ok) {
     const error = await res.json().catch(() => ({}));

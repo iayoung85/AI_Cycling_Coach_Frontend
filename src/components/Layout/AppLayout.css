@@ -67,6 +67,31 @@
   color: var(--color-text-muted);
 }
 
+.sidebar-session {
+  padding: var(--space-md);
+  margin-bottom: var(--space-lg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.sidebar-user {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.sidebar-mode {
+  margin-top: var(--space-xs);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.sidebar-logout {
+  width: 100%;
+  margin-top: var(--space-md);
+}
+
 .sidebar-footer .version {
   opacity: 0.5;
 }

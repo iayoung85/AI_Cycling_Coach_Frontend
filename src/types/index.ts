@@ -1,4 +1,14 @@
 // Plan file frontmatter
+export interface AuthUser {
+  id: number;
+  name: string;
+}
+
+export interface AuthSession {
+  access_token: string;
+  user: AuthUser;
+}
+
 export interface PlanMeta {
   week_start: string;
   season: string;
