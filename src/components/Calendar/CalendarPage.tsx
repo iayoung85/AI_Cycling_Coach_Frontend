@@ -368,6 +368,7 @@ export default function CalendarPage() {
         <FullCalendar
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
           initialView="timeGridWeek"
+          firstDay={1}
           headerToolbar={{
             left: 'prev,next today',
             center: 'title',
