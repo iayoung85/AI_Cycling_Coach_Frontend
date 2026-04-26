@@ -237,6 +237,34 @@
   cursor: not-allowed;
 }
 
+.checkbox-label {
+  margin-bottom: var(--space-xs);
+}
+
+.checkbox-control {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: 42px;
+  color: var(--color-text);
+  font-size: 0.875rem;
+}
+
+.checkbox-control input {
+  width: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  accent-color: var(--color-primary);
+}
+
+.checkbox-control input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
 /* Event modal — slightly wider to accommodate workout fields */
 .event-modal {
   max-width: 540px;
@@ -265,5 +293,18 @@
 
 .event-form .form-group {
   margin-bottom: 0;
+}
+
+@media (max-width: 700px) {
+  .calendar-legend,
+  .form-row,
+  .metadata-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-legend {
+    display: grid;
+    gap: var(--space-sm);
+  }
 }
 

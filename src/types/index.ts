@@ -16,27 +16,35 @@ export interface PlanEntry {
   athleteNotes: string[];  // content from > [!NOTE] blocks
   date: string;            // YYYY-MM-DD (from parent day heading)
   eventId?: string;        // present only on user-created events
+  allDay?: boolean;
 }
 
-export type UserEventCategory = 'Life' | 'Work' | 'Workout';
+export type UserEventCategory = Category;
 
 // Payload for creating or updating a user event
 export interface UserEventPayload {
-  time: string;
+  time?: string;
   category: UserEventCategory;
   title: string;
   notes?: string;
   workout_details?: Partial<WorkoutDetails>;
+  all_day?: boolean;
+  start_date?: string;
+  end_date?: string;
 }
 
 // Response from create/update event endpoints
 export interface UserEventResponse {
   event_id: string;
-  time: string;
+  time: string | null;
   category: string;
   title: string;
   notes: string | null;
   date: string;
+  all_day: boolean;
+  start_date: string;
+  end_date: string;
+  dates: string[];
   workout_details: Partial<WorkoutDetails> | null;
 }
 

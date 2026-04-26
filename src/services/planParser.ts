@@ -39,8 +39,8 @@ export function parsePlanFile(raw: string, filename: string): PlanWeek {
       continue;
     }
 
-    // Entry heading: ### HH:MM — Category: Title  OR  ### REST DAY
-    const entryMatch = line.match(/^### (\d{2}:\d{2})\s*[—–-]\s*(\w+):\s*(.+)/);
+    // Entry heading: ### HH:MM — Category: Title, ### All Day — Category: Title, or ### REST DAY
+    const entryMatch = line.match(/^### (All Day|\d{2}:\d{2})\s*[—–-]\s*(\w+):\s*(.+)/);
     const restMatch = !entryMatch && line.match(/^### REST DAY/i);
 
     if (restMatch && currentDate) {
@@ -57,15 +57,17 @@ export function parsePlanFile(raw: string, filename: string): PlanWeek {
     }
 
     if (entryMatch && currentDate) {
-      const [, time, rawCategory, title] = entryMatch;
+      const [, rawTime, rawCategory, title] = entryMatch;
       const category = VALID_CATEGORIES.includes(rawCategory as Category)
         ? (rawCategory as Category)
         : 'Note';
+      const time = rawTime === 'All Day' ? 'All Day' : rawTime;
 
       let description = '';
       let workoutYaml: WorkoutDetails | undefined;
       const athleteNotes: string[] = [];
       let eventId: string | undefined;
+      let allDay = rawTime === 'All Day';
 
       i++;
 
@@ -77,6 +79,19 @@ export function parsePlanFile(raw: string, filename: string): PlanWeek {
         const eventIdMatch = l.match(/^<!-- event_id:\s*(.+?)\s*-->$/);
         if (eventIdMatch) {
           eventId = eventIdMatch[1];
+          i++;
+          continue;
+        }
+
+        const allDayMatch = l.match(/^<!-- all_day:\s*true\s*-->$/i);
+        if (allDayMatch) {
+          allDay = true;
+          i++;
+          continue;
+        }
+
+        const metadataCommentMatch = l.match(/^<!--\s*(recurrence_id|all_day):/i);
+        if (metadataCommentMatch) {
           i++;
           continue;
         }
@@ -123,6 +138,7 @@ export function parsePlanFile(raw: string, filename: string): PlanWeek {
         athleteNotes,
         date: currentDate,
         eventId,
+        allDay,
       });
       continue;
     }

@@ -3,9 +3,12 @@ import type { UserEventPayload, UserEventCategory } from '../../types';
 
 interface InitialEventData {
   category: UserEventCategory;
-  time: string;
+  time?: string;
   title: string;
   notes: string;
+  allDay?: boolean;
+  startDate?: string;
+  endDate?: string;
   workoutDetails?: {
     type?: string;
     duration_minutes?: number;
@@ -35,7 +38,10 @@ export default function EventModal({
   onClose,
 }: EventModalProps) {
   const [category, setCategory] = useState<UserEventCategory>(initialData?.category ?? 'Life');
-  const [time, setTime] = useState(initialData?.time ?? initialTime);
+  const [allDay, setAllDay] = useState(initialData?.allDay ?? false);
+  const [startDate, setStartDate] = useState(initialData?.startDate ?? date);
+  const [endDate, setEndDate] = useState(initialData?.endDate ?? initialData?.startDate ?? date);
+  const [time, setTime] = useState(initialData?.time ?? (initialData?.allDay ? '09:00' : initialTime));
   const [title, setTitle] = useState(initialData?.title ?? '');
   const [notes, setNotes] = useState(initialData?.notes ?? '');
 
@@ -54,13 +60,23 @@ export default function EventModal({
 
   const handleSave = async () => {
     if (!title.trim()) { setError('Title is required'); return; }
-    if (!/^\d{2}:\d{2}$/.test(time)) { setError('Time must be HH:MM'); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) { setError('Start day must be YYYY-MM-DD'); return; }
+    if (allDay) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(endDate)) { setError('End day must be YYYY-MM-DD'); return; }
+      if (endDate < startDate) { setError('End day must be on or after start day'); return; }
+    } else if (!/^\d{2}:\d{2}$/.test(time)) {
+      setError('Time must be HH:MM');
+      return;
+    }
 
     const payload: UserEventPayload = {
       category,
-      time,
       title: title.trim(),
       notes: notes.trim() || undefined,
+      all_day: allDay,
+      start_date: startDate,
+      end_date: allDay ? endDate : startDate,
+      time: allDay ? undefined : time,
       workout_details: category === 'Workout' ? {
         type: wType || 'ride',
         duration_minutes: parseInt(wDuration) || 60,
@@ -107,21 +123,70 @@ export default function EventModal({
                 onChange={e => setCategory(e.target.value as UserEventCategory)}
                 disabled={saving}
               >
+                <option value="Workout">Workout</option>
                 <option value="Life">Life</option>
                 <option value="Work">Work</option>
-                <option value="Workout">Workout</option>
+                <option value="Note">Note</option>
+                <option value="Checkin">Checkin</option>
               </select>
             </div>
             <div className="form-group">
-              <label>Time</label>
-              <input
-                type="time"
-                value={time}
-                onChange={e => setTime(e.target.value)}
-                disabled={saving}
-              />
+              <label className="checkbox-label">All-Day Event</label>
+              <label className="checkbox-control">
+                <input
+                  type="checkbox"
+                  checked={allDay}
+                  onChange={e => setAllDay(e.target.checked)}
+                  disabled={saving}
+                />
+                <span>Show in the calendar all-day area</span>
+              </label>
             </div>
           </div>
+
+          {allDay ? (
+            <div className="form-row">
+              <div className="form-group">
+                <label>Start Day</label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={e => setStartDate(e.target.value)}
+                  disabled={saving}
+                />
+              </div>
+              <div className="form-group">
+                <label>End Day</label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={e => setEndDate(e.target.value)}
+                  disabled={saving}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="form-row">
+              <div className="form-group">
+                <label>Day</label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={e => setStartDate(e.target.value)}
+                  disabled={saving}
+                />
+              </div>
+              <div className="form-group">
+                <label>Time</label>
+                <input
+                  type="time"
+                  value={time}
+                  onChange={e => setTime(e.target.value)}
+                  disabled={saving}
+                />
+              </div>
+            </div>
+          )}
 
           <div className="form-group">
             <label>Title</label>

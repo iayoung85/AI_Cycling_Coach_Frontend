@@ -20,6 +20,8 @@ const CATEGORY_COLORS: Record<UserEventCategory, string> = {
   Work: 'var(--color-warning)',
   Life: 'var(--color-life)',
   Workout: 'var(--color-workout)',
+  Note: 'var(--color-info)',
+  Checkin: 'var(--color-primary)',
 };
 
 function formatSchedule(rule: RecurrenceRule): string {
@@ -406,6 +408,8 @@ function RuleFormFields({ form, onChange }: FieldsProps) {
             <option value="Work">Work</option>
             <option value="Life">Life</option>
             <option value="Workout">Workout</option>
+            <option value="Note">Note</option>
+            <option value="Checkin">Checkin</option>
           </select>
         </label>
       </div>

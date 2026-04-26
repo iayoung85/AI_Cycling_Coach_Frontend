@@ -4,6 +4,57 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000';
 
 let authToken: string | null = localStorage.getItem('auth_token');
 
+function getMondayOf(date: string): string {
+  const [year, month, day] = date.split('-').map(Number);
+  const value = new Date(year, month - 1, day);
+  const weekday = value.getDay();
+  const diff = weekday === 0 ? -6 : 1 - weekday;
+  value.setDate(value.getDate() + diff);
+  return [
+    value.getFullYear(),
+    String(value.getMonth() + 1).padStart(2, '0'),
+    String(value.getDate()).padStart(2, '0'),
+  ].join('-');
+}
+
+function buildDateRange(startDate: string, endDate: string): string[] {
+  const [startYear, startMonth, startDay] = startDate.split('-').map(Number);
+  const [endYear, endMonth, endDay] = endDate.split('-').map(Number);
+  const dates: string[] = [];
+  const cursor = new Date(startYear, startMonth - 1, startDay);
+  const end = new Date(endYear, endMonth - 1, endDay);
+
+  while (cursor <= end) {
+    dates.push([
+      cursor.getFullYear(),
+      String(cursor.getMonth() + 1).padStart(2, '0'),
+      String(cursor.getDate()).padStart(2, '0'),
+    ].join('-'));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return dates;
+}
+
+async function ensureWeeksExistForEvent(date: string, payload: Partial<UserEventPayload>): Promise<void> {
+  const startDate = payload.start_date ?? date;
+  const endDate = payload.end_date ?? startDate;
+  const targetDates = payload.all_day ? buildDateRange(startDate, endDate) : [startDate];
+  const mondayDates = [...new Set(targetDates.map(getMondayOf))];
+  const existingPlans = await fetchAllPlans();
+  const existingWeeks = new Set(
+    existingPlans
+      .map(plan => plan.filename.match(/^week-(\d{4}-\d{2}-\d{2})\.md$/)?.[1])
+      .filter((weekDate): weekDate is string => Boolean(weekDate))
+  );
+
+  await Promise.all(
+    mondayDates
+      .filter(mondayDate => !existingWeeks.has(mondayDate))
+      .map(mondayDate => generateWeek(mondayDate))
+  );
+}
+
 /** Update the stored auth token */
 export function setAuthToken(token: string) {
   authToken = token;
@@ -110,6 +161,10 @@ async function generateWeek(date: string): Promise<void> {
 
 /** Create a new user event (Life, Work, or Workout) for a specific date */
 export async function createEvent(date: string, payload: UserEventPayload): Promise<UserEventResponse> {
+  if (payload.all_day || payload.start_date || payload.end_date) {
+    await ensureWeeksExistForEvent(date, payload);
+  }
+
   const res = await apiFetch(`/api/plans/${date}/events`, {
     method: 'POST',
     body: JSON.stringify(payload),
@@ -142,6 +197,10 @@ export async function updateEvent(
   eventId: string,
   payload: Partial<UserEventPayload>
 ): Promise<UserEventResponse> {
+  if (payload.all_day || payload.start_date || payload.end_date) {
+    await ensureWeeksExistForEvent(date, payload);
+  }
+
   const res = await apiFetch(`/api/plans/${date}/events/${eventId}`, {
     method: 'PUT',
     body: JSON.stringify(payload),

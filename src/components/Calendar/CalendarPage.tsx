@@ -3,6 +3,7 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
+import type { DateClickArg } from '@fullcalendar/interaction';
 import type { EventClickArg, EventDropArg } from '@fullcalendar/core';
 import {
   fetchAllPlans,
@@ -13,7 +14,7 @@ import {
   rescheduleCoachEntry,
 } from '../../services/api';
 import { parsePlanFile } from '../../services/planParser';
-import type { PlanWeek, PlanEntry, Category, WorkoutDetails, UserEventPayload } from '../../types';
+import type { PlanWeek, PlanEntry, Category, WorkoutDetails, UserEventPayload, UserEventResponse } from '../../types';
 import EventModal from './EventModal';
 import './CalendarPage.css';
 
@@ -53,39 +54,63 @@ function timeFromStart(start: Date): string {
   ].join(':');
 }
 
-function replaceEntryInWeeks(
-  weeks: PlanWeek[],
-  oldDate: string,
-  oldEventId: string,
-  newEntry: PlanEntry,
-): PlanWeek[] {
-  const oldMonday = getMondayOf(oldDate);
-  const newMonday = getMondayOf(newEntry.date);
-  return weeks.map(week => {
-    let entries = week.entries;
-    if (week.meta.week_start === oldMonday) {
-      entries = entries.filter(e => !(e.date === oldDate && e.eventId === oldEventId));
-    }
-    if (week.meta.week_start === newMonday) {
-      if (!entries.some(e => e.eventId === newEntry.eventId)) {
-        entries = [...entries, newEntry];
-      }
-    }
-    return entries === week.entries ? week : { ...week, entries };
-  });
+function addDays(dateStr: string, days: number): string {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const value = new Date(year, month - 1, day);
+  value.setDate(value.getDate() + days);
+  return [
+    value.getFullYear(),
+    String(value.getMonth() + 1).padStart(2, '0'),
+    String(value.getDate()).padStart(2, '0'),
+  ].join('-');
 }
 
-function removeEntryFromWeeks(weeks: PlanWeek[], date: string, eventId: string): PlanWeek[] {
+function buildEntriesFromResponse(result: UserEventResponse): PlanEntry[] {
+  return result.dates.map(date => ({
+    eventId: result.event_id,
+    time: result.all_day ? 'All Day' : (result.time ?? '00:00'),
+    category: result.category as Category,
+    title: result.title,
+    description: result.notes ?? '',
+    workoutYaml: (result.workout_details as WorkoutDetails) ?? undefined,
+    athleteNotes: [],
+    date,
+    allDay: result.all_day,
+  }));
+}
+
+function weeksContainEntries(weeks: PlanWeek[], entries: PlanEntry[]): boolean {
+  return entries.every(entry => weeks.some(week => week.meta.week_start === getMondayOf(entry.date)));
+}
+
+function upsertUserEventInWeeks(weeks: PlanWeek[], eventId: string, entries: PlanEntry[]): PlanWeek[] {
+  const entriesByWeek = new Map<string, PlanEntry[]>();
+
+  for (const entry of entries) {
+    const monday = getMondayOf(entry.date);
+    entriesByWeek.set(monday, [...(entriesByWeek.get(monday) ?? []), entry]);
+  }
+
   return weeks.map(week => ({
     ...week,
-    entries: week.entries.filter(e => !(e.date === date && e.eventId === eventId)),
+    entries: [
+      ...week.entries.filter(entry => entry.eventId !== eventId),
+      ...(entriesByWeek.get(week.meta.week_start) ?? []),
+    ],
+  }));
+}
+
+function removeUserEventFromWeeks(weeks: PlanWeek[], eventId: string): PlanWeek[] {
+  return weeks.map(week => ({
+    ...week,
+    entries: week.entries.filter(entry => entry.eventId !== eventId),
   }));
 }
 
 type EventModalState =
   | null
-  | { mode: 'create'; date: string; time: string }
-  | { mode: 'edit'; entry: PlanEntry };
+  | { mode: 'create'; date: string; time: string; allDay: boolean }
+  | { mode: 'edit'; entry: PlanEntry; endDate?: string };
 
 export default function CalendarPage() {
   const [weeks, setWeeks] = useState<PlanWeek[]>([]);
@@ -123,9 +148,9 @@ export default function CalendarPage() {
 
   useEffect(() => { loadPlans(); }, [loadPlans]);
 
-  const fcEvents = weeks.flatMap(week =>
+  const timedEvents = weeks.flatMap(week =>
     week.entries
-      .filter(e => e.time !== 'REST')
+      .filter(entry => entry.time !== 'REST' && !entry.allDay)
       .map(entry => ({
         id: entry.eventId ?? `${entry.date}-${entry.time}-${entry.title.slice(0, 20)}`,
         title: entry.title,
@@ -140,10 +165,42 @@ export default function CalendarPage() {
       }))
   );
 
+  const groupedAllDayEntries = new Map<string, PlanEntry[]>();
+  for (const week of weeks) {
+    for (const entry of week.entries) {
+      if (!entry.allDay || !entry.eventId) {
+        continue;
+      }
+      groupedAllDayEntries.set(entry.eventId, [...(groupedAllDayEntries.get(entry.eventId) ?? []), entry]);
+    }
+  }
+
+  const allDayEvents = Array.from(groupedAllDayEntries.entries()).map(([eventId, entries]) => {
+    const sortedEntries = [...entries].sort((left, right) => left.date.localeCompare(right.date));
+    const firstEntry = sortedEntries[0];
+    const lastEntry = sortedEntries[sortedEntries.length - 1];
+    const color = CATEGORY_COLORS[firstEntry.category] ?? '#3b82f6';
+
+    return {
+      id: eventId,
+      title: firstEntry.title,
+      start: firstEntry.date,
+      end: addDays(lastEntry.date, 1),
+      allDay: true,
+      backgroundColor: color,
+      borderColor: color,
+      editable: false,
+      extendedProps: { entry: firstEntry, endDate: lastEntry.date },
+    };
+  });
+
+  const fcEvents = [...timedEvents, ...allDayEvents];
+
   const handleEventClick = (clickInfo: EventClickArg) => {
     const entry = clickInfo.event.extendedProps.entry as PlanEntry;
+    const endDate = clickInfo.event.extendedProps.endDate as string | undefined;
     if (entry.eventId) {
-      setEventModal({ mode: 'edit', entry });
+      setEventModal({ mode: 'edit', entry, endDate });
     } else {
       setNoteEntry(entry);
       setNoteInput('');
@@ -156,45 +213,45 @@ export default function CalendarPage() {
     }
   };
 
-  const handleDateClick = (info: { date: Date; allDay: boolean }) => {
+  const handleDateClick = (info: DateClickArg) => {
     const date = dateFromStart(info.date);
     const time = info.allDay ? '09:00' : timeFromStart(info.date);
-    setEventModal({ mode: 'create', date, time });
+    setEventModal({ mode: 'create', date, time, allDay: info.allDay });
   };
 
   const handleEventDrop = async (dropInfo: EventDropArg) => {
     const entry = dropInfo.event.extendedProps.entry as PlanEntry;
     const newStart = dropInfo.event.start!;
     const newDate = dateFromStart(newStart);
-    const newTime = dropInfo.event.allDay ? entry.time : timeFromStart(newStart);
+    const newTime = timeFromStart(newStart);
 
-    // Cross-week drops are not supported
-    if (getMondayOf(newDate) !== getMondayOf(entry.date)) {
+    if (dropInfo.event.allDay || entry.allDay) {
       dropInfo.revert();
       return;
     }
 
     try {
       if (entry.eventId) {
-        // ── User-created event ──────────────────────────────────────────────
-        let resultEntry: PlanEntry;
-        if (newDate === entry.date) {
-          const result = await updateEvent(entry.date, entry.eventId, { time: newTime });
-          resultEntry = { ...entry, time: result.time };
+        const result = await updateEvent(entry.date, entry.eventId, {
+          all_day: false,
+          start_date: newDate,
+          end_date: newDate,
+          time: newTime,
+          workout_details: entry.category === 'Workout' ? entry.workoutYaml : undefined,
+        });
+        const updatedEntries = buildEntriesFromResponse(result);
+        if (!weeksContainEntries(weeks, updatedEntries)) {
+          await loadPlans();
         } else {
-          await deleteEvent(entry.date, entry.eventId);
-          const result = await createEvent(newDate, {
-            time: newTime,
-            category: entry.category as 'Life' | 'Work' | 'Workout',
-            title: entry.title,
-            notes: entry.description || undefined,
-            workout_details: entry.workoutYaml,
-          });
-          resultEntry = { ...entry, date: newDate, time: result.time, eventId: result.event_id };
+          setWeeks(prev => upsertUserEventInWeeks(prev, entry.eventId!, updatedEntries));
         }
-        setWeeks(prev => replaceEntryInWeeks(prev, entry.date, entry.eventId!, resultEntry));
       } else {
         // ── Coach-written entry ─────────────────────────────────────────────
+        if (getMondayOf(newDate) !== getMondayOf(entry.date)) {
+          dropInfo.revert();
+          return;
+        }
+
         const result = await rescheduleCoachEntry(
           entry.date, entry.time, entry.category, entry.title, newDate, newTime
         );
@@ -218,31 +275,14 @@ export default function CalendarPage() {
 
   const handleCreateEvent = async (payload: UserEventPayload) => {
     if (eventModal?.mode !== 'create') return;
-    const { date } = eventModal;
-    const monday = getMondayOf(date);
-    const weekExists = weeks.some(w => w.meta.week_start === monday);
+    const eventDate = payload.start_date ?? eventModal.date;
+    const result = await createEvent(eventDate, payload);
+    const newEntries = buildEntriesFromResponse(result);
 
-    const result = await createEvent(date, payload);
-
-    if (!weekExists) {
-      // Week was auto-generated — reload all plans so the new week appears
+    if (!weeksContainEntries(weeks, newEntries)) {
       await loadPlans();
     } else {
-      const newEntry: PlanEntry = {
-        eventId: result.event_id,
-        time: result.time,
-        category: result.category as Category,
-        title: result.title,
-        description: result.notes ?? '',
-        workoutYaml: (result.workout_details as WorkoutDetails) ?? undefined,
-        athleteNotes: [],
-        date,
-      };
-      setWeeks(prev => prev.map(week =>
-        week.meta.week_start === monday
-          ? { ...week, entries: [...week.entries, newEntry] }
-          : week
-      ));
+      setWeeks(prev => upsertUserEventInWeeks(prev, result.event_id, newEntries));
     }
     setEventModal(null);
   };
@@ -251,15 +291,13 @@ export default function CalendarPage() {
     if (eventModal?.mode !== 'edit') return;
     const { entry } = eventModal;
     const result = await updateEvent(entry.date, entry.eventId!, payload);
-    const updatedEntry: PlanEntry = {
-      ...entry,
-      time: result.time,
-      category: result.category as Category,
-      title: result.title,
-      description: result.notes ?? '',
-      workoutYaml: (result.workout_details as WorkoutDetails) ?? undefined,
-    };
-    setWeeks(prev => replaceEntryInWeeks(prev, entry.date, entry.eventId!, updatedEntry));
+    const updatedEntries = buildEntriesFromResponse(result);
+
+    if (!weeksContainEntries(weeks, updatedEntries)) {
+      await loadPlans();
+    } else {
+      setWeeks(prev => upsertUserEventInWeeks(prev, entry.eventId!, updatedEntries));
+    }
     setEventModal(null);
   };
 
@@ -267,7 +305,7 @@ export default function CalendarPage() {
     if (eventModal?.mode !== 'edit') return;
     const { entry } = eventModal;
     await deleteEvent(entry.date, entry.eventId!);
-    setWeeks(prev => removeEntryFromWeeks(prev, entry.date, entry.eventId!));
+    setWeeks(prev => removeUserEventFromWeeks(prev, entry.eventId!));
     setEventModal(null);
   };
 
@@ -351,7 +389,7 @@ export default function CalendarPage() {
       <div className="page-header">
         <h2>Training Calendar</h2>
         <p className="page-subtitle">
-          {weeks.length} week{weeks.length !== 1 ? 's' : ''} loaded &mdash; click a time slot to add an event
+          {weeks.length} week{weeks.length !== 1 ? 's' : ''} loaded &mdash; click a time slot, month day, or weekly all-day row to add an event
         </p>
       </div>
 
@@ -491,13 +529,26 @@ export default function CalendarPage() {
           mode={eventModal.mode}
           date={eventModal.mode === 'create' ? eventModal.date : eventModal.entry.date}
           initialTime={eventModal.mode === 'create' ? eventModal.time : eventModal.entry.time}
-          initialData={eventModal.mode === 'edit' ? {
-            category: eventModal.entry.category as 'Life' | 'Work' | 'Workout',
-            time: eventModal.entry.time,
-            title: eventModal.entry.title,
-            notes: eventModal.entry.description ?? '',
-            workoutDetails: eventModal.entry.workoutYaml,
-          } : undefined}
+          initialData={eventModal.mode === 'create'
+            ? {
+                category: 'Life',
+                time: eventModal.time,
+                title: '',
+                notes: '',
+                allDay: eventModal.allDay,
+                startDate: eventModal.date,
+                endDate: eventModal.date,
+              }
+            : {
+                category: eventModal.entry.category,
+                time: eventModal.entry.allDay ? undefined : eventModal.entry.time,
+                title: eventModal.entry.title,
+                notes: eventModal.entry.description ?? '',
+                allDay: eventModal.entry.allDay,
+                startDate: eventModal.entry.date,
+                endDate: eventModal.endDate ?? eventModal.entry.date,
+                workoutDetails: eventModal.entry.workoutYaml,
+              }}
           onSave={eventModal.mode === 'create' ? handleCreateEvent : handleUpdateEvent}
           onDelete={eventModal.mode === 'edit' ? handleDeleteEvent : undefined}
           onClose={() => setEventModal(null)}
