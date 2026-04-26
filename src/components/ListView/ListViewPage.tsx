@@ -1,7 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
-import { fetchAllPlans } from '../../services/api';
+import { fetchAllPlans, submitAthleteNote } from '../../services/api';
 import { parsePlanFile } from '../../services/planParser';
 import type { PlanWeek, PlanEntry, Category } from '../../types';
+import EntryDetailModal from '../EntryDetail/EntryDetailModal';
+import {
+  applyAthleteNoteToWeeks,
+  buildAthleteNoteRequest,
+  type EntryDetailModalNotePayload,
+} from '../EntryDetail/entryNoteUtils';
 import './ListViewPage.css';
 
 type FilterOption = Category | 'All';
@@ -33,23 +39,54 @@ function formatWeekRange(weekStart: string): string {
   return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
 }
 
-function EntryCard({ entry }: { entry: PlanEntry }) {
-  const [open, setOpen] = useState(false);
+function getEntryPreview(entry: PlanEntry): string | null {
+  const description = entry.description.trim();
+
+  if (description) {
+    return description;
+  }
+
+  if (entry.workoutYaml?.notes) {
+    return entry.workoutYaml.notes;
+  }
+
+  if (entry.workoutYaml?.structure?.length) {
+    return entry.workoutYaml.structure[0];
+  }
+
+  if (entry.workoutYaml) {
+    const summary = [
+      entry.workoutYaml.type,
+      entry.workoutYaml.duration_minutes != null ? `${entry.workoutYaml.duration_minutes} min` : null,
+      entry.workoutYaml.intensity,
+    ].filter(Boolean);
+
+    if (summary.length > 0) {
+      return summary.join(' • ');
+    }
+  }
+
+  if (entry.athleteNotes.length > 0) {
+    return 'Includes your notes';
+  }
+
+  return null;
+}
+
+function EntryCard({ entry, onSelect }: { entry: PlanEntry; onSelect: (entry: PlanEntry) => void }) {
   const color = CATEGORY_COLORS[entry.category] ?? '#3b82f6';
-  const hasBody =
-    entry.description.trim().length > 0 ||
-    entry.workoutYaml != null ||
-    entry.athleteNotes.length > 0;
+  const preview = getEntryPreview(entry);
+  const timeLabel = entry.allDay ? 'All Day' : entry.time;
 
   return (
-    <div className="lv-entry" style={{ borderLeftColor: color }}>
-      <button
-        className="lv-entry-header"
-        onClick={() => setOpen(o => !o)}
-        disabled={!hasBody}
-        aria-expanded={hasBody ? open : undefined}
-      >
-        <span className="lv-entry-time">{entry.time}</span>
+    <button
+      type="button"
+      className="lv-entry"
+      style={{ borderLeftColor: color }}
+      onClick={() => onSelect(entry)}
+    >
+      <div className="lv-entry-header">
+        <span className="lv-entry-time">{timeLabel}</span>
         <span
           className="lv-category-pill"
           style={{ background: color + '22', color }}
@@ -57,42 +94,10 @@ function EntryCard({ entry }: { entry: PlanEntry }) {
           {entry.category}
         </span>
         <span className="lv-entry-title">{entry.title}</span>
-        {hasBody && <span className="lv-chevron">{open ? '▲' : '▼'}</span>}
-      </button>
-
-      {open && hasBody && (
-        <div className="lv-entry-body">
-          {entry.description.trim() && (
-            <p className="lv-description">{entry.description.trim()}</p>
-          )}
-          {entry.workoutYaml && (
-            <div className="lv-workout-chips">
-              {entry.workoutYaml.type && (
-                <span className="lv-chip">{entry.workoutYaml.type}</span>
-              )}
-              {entry.workoutYaml.duration_minutes != null && (
-                <span className="lv-chip">{entry.workoutYaml.duration_minutes} min</span>
-              )}
-              {entry.workoutYaml.intensity && (
-                <span className="lv-chip">{entry.workoutYaml.intensity}</span>
-              )}
-              {entry.workoutYaml.tss_planned != null && (
-                <span className="lv-chip">TSS {entry.workoutYaml.tss_planned}</span>
-              )}
-              {entry.workoutYaml.notes && (
-                <p className="lv-workout-note">{entry.workoutYaml.notes}</p>
-              )}
-            </div>
-          )}
-          {entry.athleteNotes.map((note, i) => (
-            <blockquote key={i} className="lv-athlete-note">
-              <span className="lv-note-label">Your note</span>
-              <p>{note}</p>
-            </blockquote>
-          ))}
-        </div>
-      )}
-    </div>
+        <span className="lv-chevron" aria-hidden="true">Open</span>
+      </div>
+      {preview && <p className="lv-entry-preview">{preview}</p>}
+    </button>
   );
 }
 
@@ -102,6 +107,7 @@ export default function ListViewPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterOption>('All');
+  const [selectedEntry, setSelectedEntry] = useState<PlanEntry | null>(null);
 
   const loadPlans = useCallback(async (options?: { forceRefresh?: boolean; preserveContent?: boolean }) => {
     try {
@@ -126,6 +132,32 @@ export default function ListViewPage() {
   }, []);
 
   useEffect(() => { loadPlans(); }, [loadPlans]);
+
+  const handleSubmitNote = async (payload: EntryDetailModalNotePayload) => {
+    if (!selectedEntry || selectedEntry.eventId) {
+      return;
+    }
+
+    const { noteToSend, metadata } = buildAthleteNoteRequest(selectedEntry, payload);
+
+    if (!noteToSend && !metadata) {
+      return;
+    }
+
+    try {
+      const result = await submitAthleteNote(selectedEntry.date, noteToSend, metadata);
+
+      if (result.note_content !== undefined) {
+        const { weeks: updatedWeeks, updatedEntry } = applyAthleteNoteToWeeks(weeks, selectedEntry, result.note_content);
+        setWeeks(updatedWeeks);
+        if (updatedEntry) {
+          setSelectedEntry(updatedEntry);
+        }
+      }
+    } catch (err) {
+      throw err instanceof Error ? err : new Error('Failed to submit note');
+    }
+  };
 
   // Group entries by date, applying category filter (REST entries only shown when filter is 'All')
   const visibleWeeks = weeks
@@ -206,7 +238,11 @@ export default function ListViewPage() {
                       entry.time === 'REST' ? (
                         <div key={i} className="lv-rest">Rest Day</div>
                       ) : (
-                        <EntryCard key={`${entry.date}-${entry.time}-${i}`} entry={entry} />
+                        <EntryCard
+                          key={`${entry.date}-${entry.time}-${i}`}
+                          entry={entry}
+                          onSelect={setSelectedEntry}
+                        />
                       )
                     )}
                   </div>
@@ -215,6 +251,14 @@ export default function ListViewPage() {
             </section>
           ))}
         </div>
+      )}
+
+      {selectedEntry && (
+        <EntryDetailModal
+          entry={selectedEntry}
+          onClose={() => setSelectedEntry(null)}
+          onSubmitNote={selectedEntry.eventId ? undefined : handleSubmitNote}
+        />
       )}
     </div>
   );

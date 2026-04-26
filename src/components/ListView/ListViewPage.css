@@ -62,12 +62,18 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
+  padding: var(--space-md);
+  background: rgba(30, 41, 59, 0.62);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
 }
 
 .lv-week-header {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
   border-bottom: 1px solid var(--color-border);
   padding-bottom: var(--space-sm);
 }
@@ -98,8 +104,7 @@
 .lv-day {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
-  padding-left: var(--space-md);
+  gap: var(--space-sm);
 }
 
 .lv-day-heading {
@@ -119,32 +124,28 @@
 
 /* ── Entry card ──────────────────────────────────────────── */
 .lv-entry {
-  border-left: 3px solid var(--color-border);
+  display: block;
+  width: 100%;
+  text-align: left;
   background: var(--color-surface);
-  border-radius: 0 var(--radius-md) var(--radius-md) 0;
-  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
+}
+
+.lv-entry:hover {
+  background: var(--color-surface-hover);
+  transform: translateY(-1px);
 }
 
 .lv-entry-header {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  width: 100%;
-  text-align: left;
-  background: transparent;
-  padding: var(--space-sm) var(--space-md);
-  border-radius: 0;
   color: var(--color-text);
   font-size: 0.9375rem;
-}
-
-.lv-entry-header:not(:disabled):hover {
-  background: var(--color-surface-hover);
-}
-
-.lv-entry-header:disabled {
-  cursor: default;
-  opacity: 1;
 }
 
 .lv-entry-time {
@@ -168,77 +169,27 @@
 .lv-entry-title {
   flex: 1;
   font-weight: 500;
+  min-width: 0;
 }
 
 .lv-chevron {
-  font-size: 0.5rem;
-  color: var(--color-text-muted);
-  flex-shrink: 0;
-}
-
-/* ── Entry body ──────────────────────────────────────────── */
-.lv-entry-body {
-  padding: var(--space-sm) var(--space-md) var(--space-md);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-  border-top: 1px solid var(--color-border);
-}
-
-.lv-description {
-  font-size: 0.875rem;
-  color: var(--color-text-muted);
-  line-height: 1.6;
-  white-space: pre-wrap;
-}
-
-.lv-workout-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-xs);
-  align-items: center;
-}
-
-.lv-chip {
-  font-size: 0.75rem;
-  background: var(--color-surface-hover);
-  color: var(--color-text-muted);
-  padding: 0.125rem 0.625rem;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-}
-
-.lv-workout-note {
-  font-size: 0.8125rem;
-  color: var(--color-text-muted);
-  width: 100%;
-  margin-top: var(--space-xs);
-  white-space: pre-wrap;
-}
-
-.lv-athlete-note {
-  margin: 0;
-  background: rgba(59, 130, 246, 0.06);
-  border-left: 2px solid var(--color-primary);
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-  padding: var(--space-sm) var(--space-md);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-}
-
-.lv-note-label {
   font-size: 0.6875rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--color-primary);
+  color: var(--color-text-muted);
+  flex-shrink: 0;
 }
 
-.lv-athlete-note p {
-  font-size: 0.875rem;
+.lv-entry-preview {
+  margin-top: var(--space-sm);
+  font-size: 0.8125rem;
   color: var(--color-text-muted);
-  white-space: pre-wrap;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 /* ── Rest day ────────────────────────────────────────────── */
@@ -263,7 +214,54 @@
 }
 
 @media (max-width: 768px) {
+  .lv-page {
+    gap: var(--space-lg);
+  }
+
+  .lv-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-md);
+  }
+
   .lv-refresh-btn {
     width: 100%;
+  }
+
+  .lv-filters {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: var(--space-xs);
+  }
+
+  .lv-filter-btn {
+    white-space: nowrap;
+  }
+
+  .lv-week {
+    padding: var(--space-md) var(--space-sm);
+  }
+
+  .lv-week-title {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+  }
+
+  .lv-entry-header {
+    flex-wrap: wrap;
+  }
+
+  .lv-entry-time {
+    min-width: auto;
+  }
+
+  .lv-entry-title {
+    width: 100%;
+    order: 3;
+  }
+
+  .lv-chevron {
+    margin-left: auto;
   }
 }

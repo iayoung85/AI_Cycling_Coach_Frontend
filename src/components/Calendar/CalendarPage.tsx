@@ -15,6 +15,12 @@ import {
 } from '../../services/api';
 import { parsePlanFile, normalizeWorkoutDetails } from '../../services/planParser';
 import type { PlanWeek, PlanEntry, Category, UserEventPayload, UserEventResponse } from '../../types';
+import EntryDetailModal from '../EntryDetail/EntryDetailModal';
+import {
+  applyAthleteNoteToWeeks,
+  buildAthleteNoteRequest,
+  type EntryDetailModalNotePayload,
+} from '../EntryDetail/entryNoteUtils';
 import EventModal from './EventModal';
 import './CalendarPage.css';
 
@@ -117,17 +123,12 @@ export default function CalendarPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(() => (
+    typeof window !== 'undefined' ? window.innerWidth < 768 : false
+  ));
 
   // Coach-entry note modal
   const [noteEntry, setNoteEntry] = useState<PlanEntry | null>(null);
-  const [noteInput, setNoteInput] = useState('');
-  const [actualDuration, setActualDuration] = useState('');
-  const [freshness, setFreshness] = useState('');
-  const [difficulty, setDifficulty] = useState('');
-  const [rpe, setRpe] = useState('');
-  const [stats, setStats] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // User-event CRUD modal
   const [eventModal, setEventModal] = useState<EventModalState>(null);
@@ -153,6 +154,13 @@ export default function CalendarPage() {
   }, []);
 
   useEffect(() => { loadPlans(); }, [loadPlans]);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const timedEvents = weeks.flatMap(week =>
     week.entries
@@ -209,13 +217,6 @@ export default function CalendarPage() {
       setEventModal({ mode: 'edit', entry, endDate });
     } else {
       setNoteEntry(entry);
-      setNoteInput('');
-      setActualDuration('');
-      setFreshness('');
-      setDifficulty('');
-      setRpe('');
-      setStats('');
-      setSubmitMessage(null);
     }
   };
 
@@ -315,67 +316,33 @@ export default function CalendarPage() {
     setEventModal(null);
   };
 
-  const handleSubmitNote = async () => {
+  const handleSubmitNote = async (payload: EntryDetailModalNotePayload) => {
     if (!noteEntry) return;
-    const originalWeeks = weeks;
-    const originalEntry = noteEntry;
+    const { noteToSend, metadata } = buildAthleteNoteRequest(noteEntry, payload);
 
-    const userProvidedNote = noteInput.trim();
-    const hasExistingNotes = (noteEntry.athleteNotes || []).length > 0;
-    const shouldSendNote = userProvidedNote || !hasExistingNotes;
-
-    const noteToSend = userProvidedNote ||
-      (shouldSendNote ? (noteEntry.category === 'Workout' ? 'Workout stats' : 'Rest day stats') : undefined);
-
-    const metadata: Record<string, unknown> = {};
-    if (actualDuration) metadata.actual_duration = parseInt(actualDuration, 10);
-    if (freshness) metadata.freshness = parseInt(freshness, 10);
-    if (difficulty) metadata.difficulty = parseInt(difficulty, 10);
-    if (rpe) metadata.rpe = parseInt(rpe, 10);
-    if (stats) metadata.stats = stats;
-
-    const hasMetadata = Object.keys(metadata).length > 0;
-    if (!noteToSend && !hasMetadata) return;
-
-    setNoteInput('');
-    setActualDuration('');
-    setFreshness('');
-    setDifficulty('');
-    setRpe('');
-    setStats('');
-    setSubmitting(true);
-    setSubmitMessage(null);
+    if (!noteToSend && !metadata) {
+      return;
+    }
 
     try {
-      const result = await submitAthleteNote(
-        noteEntry.date,
-        noteToSend,
-        hasMetadata
-          ? (metadata as { actual_duration?: number; freshness?: number; difficulty?: number; rpe?: number; stats?: string })
-          : undefined
-      );
+      const result = await submitAthleteNote(noteEntry.date, noteToSend, metadata);
 
       if (result.note_content !== undefined) {
-        const applyNote = (e: PlanEntry) =>
-          e.date === originalEntry.date && e.title === originalEntry.title
-            ? { ...e, athleteNotes: [result.note_content!] }
-            : e;
-        const updatedWeeks = weeks.map(week => ({ ...week, entries: week.entries.map(applyNote) }));
+        const { weeks: updatedWeeks, updatedEntry } = applyAthleteNoteToWeeks(weeks, noteEntry, result.note_content);
         setWeeks(updatedWeeks);
-        const updatedEntry = updatedWeeks.flatMap(w => w.entries)
-          .find(e => e.date === originalEntry.date && e.title === originalEntry.title);
-        if (updatedEntry) setNoteEntry(updatedEntry);
+        if (updatedEntry) {
+          setNoteEntry(updatedEntry);
+        }
       }
-
-      setSubmitMessage({ type: 'success', text: 'Note submitted!' });
     } catch (err) {
-      setWeeks(originalWeeks);
-      setNoteEntry(originalEntry);
-      setSubmitMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to submit note' });
-    } finally {
-      setSubmitting(false);
+      throw err instanceof Error ? err : new Error('Failed to submit note');
     }
   };
+
+  const calendarView = isMobile ? 'dayGridMonth' : 'timeGridWeek';
+  const calendarToolbar = isMobile
+    ? { left: 'prev,next', center: 'title', right: 'dayGridMonth,timeGridDay' }
+    : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek' };
 
   if (loading) return <div className="calendar-page"><p>Loading plans…</p></div>;
 
@@ -420,14 +387,11 @@ export default function CalendarPage() {
 
       <div className="calendar-wrapper">
         <FullCalendar
+          key={calendarView}
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-          initialView="timeGridWeek"
+          initialView={calendarView}
           firstDay={1}
-          headerToolbar={{
-            left: 'prev,next today',
-            center: 'title',
-            right: 'dayGridMonth,timeGridWeek',
-          }}
+          headerToolbar={calendarToolbar}
           editable={true}
           eventClick={handleEventClick}
           eventDrop={handleEventDrop}
@@ -435,6 +399,7 @@ export default function CalendarPage() {
           events={fcEvents}
           height="auto"
           eventDisplay="block"
+          dayMaxEventRows={isMobile ? 2 : true}
           slotMinTime="05:00:00"
           slotMaxTime="23:00:00"
           nowIndicator={true}
@@ -442,107 +407,12 @@ export default function CalendarPage() {
         />
       </div>
 
-      {/* Coach-entry modal: view details + add athlete note */}
       {noteEntry && (
-        <div className="modal-overlay" onClick={() => setNoteEntry(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <h3>{noteEntry.category}: {noteEntry.title}</h3>
-            <p className="entry-meta">{noteEntry.date} at {noteEntry.time}</p>
-
-            {noteEntry.description && (
-              <div className="entry-description">{noteEntry.description}</div>
-            )}
-
-            {noteEntry.workoutYaml && (
-              <div className="workout-details">
-                {noteEntry.workoutYaml.type && (
-                  <p><strong>Type:</strong> {noteEntry.workoutYaml.type}</p>
-                )}
-                {noteEntry.workoutYaml.duration_minutes != null && (
-                  <p><strong>Duration:</strong> {noteEntry.workoutYaml.duration_minutes} min</p>
-                )}
-                {noteEntry.workoutYaml.intensity && (
-                  <p><strong>Intensity:</strong> {noteEntry.workoutYaml.intensity}</p>
-                )}
-                {noteEntry.workoutYaml.tss_planned != null && (
-                  <p><strong>TSS:</strong> {noteEntry.workoutYaml.tss_planned}</p>
-                )}
-                {noteEntry.workoutYaml.structure && (
-                  <div className="workout-structure">
-                    <strong>Structure:</strong>
-                    <ul>
-                      {noteEntry.workoutYaml.structure.map((step, i) => (
-                        <li key={i}>{step}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {noteEntry.workoutYaml.notes && (
-                  <p className="workout-notes">{noteEntry.workoutYaml.notes}</p>
-                )}
-              </div>
-            )}
-
-            {noteEntry.athleteNotes.length > 0 && (
-              <div className="athlete-notes">
-                <strong>My Notes:</strong>
-                {noteEntry.athleteNotes.map((note, i) => (
-                  <blockquote key={i}>{note}</blockquote>
-                ))}
-              </div>
-            )}
-
-            <div className="note-form">
-              <label htmlFor="note-input">Your Notes:</label>
-              <textarea
-                id="note-input"
-                placeholder="How did this go? (optional)"
-                value={noteInput}
-                onChange={e => setNoteInput(e.target.value)}
-                rows={3}
-                disabled={submitting}
-              />
-
-              <div className="metadata-grid">
-                <div className="form-group">
-                  <label htmlFor="actual-duration">Actual Duration (min)</label>
-                  <input id="actual-duration" type="number" placeholder="77" value={actualDuration} onChange={e => setActualDuration(e.target.value)} disabled={submitting} />
-                </div>
-                <div className="form-group">
-                  <label htmlFor="freshness">Freshness (1-10)</label>
-                  <input id="freshness" type="number" min="1" max="10" placeholder="8" value={freshness} onChange={e => setFreshness(e.target.value)} disabled={submitting} />
-                </div>
-                <div className="form-group">
-                  <label htmlFor="difficulty">Difficulty (1-10)</label>
-                  <input id="difficulty" type="number" min="1" max="10" placeholder="7" value={difficulty} onChange={e => setDifficulty(e.target.value)} disabled={submitting} />
-                </div>
-                <div className="form-group">
-                  <label htmlFor="rpe">RPE (1-10)</label>
-                  <input id="rpe" type="number" min="1" max="10" placeholder="7" value={rpe} onChange={e => setRpe(e.target.value)} disabled={submitting} />
-                </div>
-                <div className="form-group full-width">
-                  <label htmlFor="stats">Stats / Other Data</label>
-                  <input id="stats" type="text" placeholder="e.g., 203W avg, HR 145" value={stats} onChange={e => setStats(e.target.value)} disabled={submitting} />
-                </div>
-              </div>
-
-              {submitMessage && (
-                <p className={`submit-message ${submitMessage.type}`}>{submitMessage.text}</p>
-              )}
-            </div>
-
-            <div className="modal-actions">
-              <button
-                className="btn-primary"
-                onClick={handleSubmitNote}
-                disabled={submitting || !noteEntry || (!noteInput.trim() && !actualDuration && !freshness && !difficulty && !rpe && !stats)}
-              >
-                {submitting ? 'Submitting…' : 'Submit'}
-              </button>
-              <button className="btn-ghost" onClick={() => setNoteEntry(null)}>Close</button>
-            </div>
-          </div>
-        </div>
+        <EntryDetailModal
+          entry={noteEntry}
+          onClose={() => setNoteEntry(null)}
+          onSubmitNote={handleSubmitNote}
+        />
       )}
 
       {/* User event create / edit modal */}

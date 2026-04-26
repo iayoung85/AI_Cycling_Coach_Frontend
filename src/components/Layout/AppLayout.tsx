@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import { NavLink } from 'react-router-dom';
+import { useEffect, useState, type ReactNode } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import type { AuthUser } from '../../types';
 import './AppLayout.css';
 
@@ -11,26 +11,33 @@ interface Props {
 }
 
 export default function AppLayout({ children, user, isLocalMode, onLogout }: Props) {
+  const location = useLocation();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    setIsSidebarOpen(false);
+  }, [location.pathname]);
+
   return (
-    <div className="app-layout">
-      <nav className="sidebar">
+    <div className={`app-layout${isSidebarOpen ? ' sidebar-open' : ''}`}>
+      <nav className="sidebar" id="primary-sidebar" aria-label="Primary navigation">
         <div className="sidebar-brand">
           <span className="brand-icon">🚴</span>
           <h1>CycleCoach</h1>
         </div>
         <ul className="nav-links">
           <li>
-            <NavLink to="/" end>
+            <NavLink to="/" end onClick={() => setIsSidebarOpen(false)}>
               📅 Calendar
             </NavLink>
           </li>
           <li>
-            <NavLink to="/list">
+            <NavLink to="/list" onClick={() => setIsSidebarOpen(false)}>
               📋 List
             </NavLink>
           </li>
           <li>
-            <NavLink to="/recurring">
+            <NavLink to="/recurring" onClick={() => setIsSidebarOpen(false)}>
               🔁 Recurring
             </NavLink>
           </li>
@@ -49,9 +56,39 @@ export default function AppLayout({ children, user, isLocalMode, onLogout }: Pro
           <p className="version">v2.0.0</p>
         </div>
       </nav>
-      <main className="main-content">
-        {children}
-      </main>
+
+      {isSidebarOpen && (
+        <button
+          type="button"
+          className="sidebar-backdrop"
+          aria-label="Close navigation menu"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
+      <div className="app-shell">
+        <header className="mobile-header">
+          <button
+            type="button"
+            className="btn-ghost sidebar-toggle"
+            aria-controls="primary-sidebar"
+            aria-expanded={isSidebarOpen}
+            onClick={() => setIsSidebarOpen(open => !open)}
+          >
+            <span className="sidebar-toggle-icon" aria-hidden="true">=</span>
+            <span>Menu</span>
+          </button>
+
+          <div className="mobile-header-brand">
+            <span className="brand-icon">🚴</span>
+            <span>CycleCoach</span>
+          </div>
+        </header>
+
+        <main className="main-content">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }

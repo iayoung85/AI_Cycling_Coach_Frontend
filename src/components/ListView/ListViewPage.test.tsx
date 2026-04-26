@@ -47,4 +47,13 @@ describe('ListViewPage', () => {
       expect(fetchAllPlansMock).toHaveBeenNthCalledWith(2, { forceRefresh: true });
     });
   });
+
+  it('opens the shared entry detail modal from the list view', async () => {
+    render(<ListViewPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Easy Endurance Ride/i }));
+
+    expect(await screen.findByText('Workout: Easy Endurance Ride')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
+  });
 });
