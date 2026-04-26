@@ -48,7 +48,7 @@ export interface WorkoutDetails {
   duration_minutes: number;
   intensity: string;
   tss_planned?: number;
-  structure?: { [key: string]: string }[];
+  structure?: string[];
   notes?: string;
 }
 

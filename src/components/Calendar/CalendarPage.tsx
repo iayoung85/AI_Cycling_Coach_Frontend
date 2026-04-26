@@ -403,17 +403,16 @@ export default function CalendarPage() {
                 <p><strong>Type:</strong> {noteEntry.workoutYaml.type}</p>
                 <p><strong>Duration:</strong> {noteEntry.workoutYaml.duration_minutes} min</p>
                 <p><strong>Intensity:</strong> {noteEntry.workoutYaml.intensity}</p>
-                {noteEntry.workoutYaml.tss_planned && (
+                {noteEntry.workoutYaml.tss_planned != null && (
                   <p><strong>TSS:</strong> {noteEntry.workoutYaml.tss_planned}</p>
                 )}
                 {noteEntry.workoutYaml.structure && (
                   <div className="workout-structure">
                     <strong>Structure:</strong>
                     <ul>
-                      {noteEntry.workoutYaml.structure.map((step, i) => {
-                        const [key, val] = Object.entries(step)[0];
-                        return <li key={i}><em>{key}:</em> {val}</li>;
-                      })}
+                      {noteEntry.workoutYaml.structure.map((step, i) => (
+                        <li key={i}>{step}</li>
+                      ))}
                     </ul>
                   </div>
                 )}
