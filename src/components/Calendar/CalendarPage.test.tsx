@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as api from '../../services/api';
@@ -113,5 +113,17 @@ describe('CalendarPage', () => {
     expect(await screen.findByText('Workout: Easy Endurance Ride — Back to It')).toBeInTheDocument();
     expect(screen.getByText('warmup: 10min Z1')).toBeInTheDocument();
     expect(screen.getByText('main: 40min Z2, steady rhythmic pedaling, 85-95rpm')).toBeInTheDocument();
+  });
+
+  it('force refreshes plans from GitHub when the refresh button is clicked', async () => {
+    render(<CalendarPage />);
+
+    await screen.findByRole('button', { name: 'Easy Endurance Ride — Back to It' });
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh from GitHub' }));
+
+    await waitFor(() => {
+      expect(fetchAllPlansMock).toHaveBeenNthCalledWith(1, { forceRefresh: undefined });
+      expect(fetchAllPlansMock).toHaveBeenNthCalledWith(2, { forceRefresh: true });
+    });
   });
 });

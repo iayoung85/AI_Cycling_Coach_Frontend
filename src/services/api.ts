@@ -217,8 +217,9 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
 }
 
 /** Fetch all plan files from backend */
-export async function fetchAllPlans(): Promise<Array<{ filename: string; content: string }>> {
-  const response = await apiFetch('/api/plans');
+export async function fetchAllPlans(options?: { forceRefresh?: boolean }): Promise<Array<{ filename: string; content: string }>> {
+  const endpoint = options?.forceRefresh ? '/api/plans?force_refresh=1' : '/api/plans';
+  const response = await apiFetch(endpoint);
   if (!response.ok) throw new Error(`Failed to fetch plans: ${response.status}`);
   const data = await response.json();
   return data.plans || [];

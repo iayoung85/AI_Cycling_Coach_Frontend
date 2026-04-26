@@ -99,13 +99,18 @@ function EntryCard({ entry }: { entry: PlanEntry }) {
 export default function ListViewPage() {
   const [weeks, setWeeks] = useState<PlanWeek[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterOption>('All');
 
-  const loadPlans = useCallback(async () => {
+  const loadPlans = useCallback(async (options?: { forceRefresh?: boolean; preserveContent?: boolean }) => {
     try {
-      setLoading(true);
-      const files = await fetchAllPlans();
+      if (options?.preserveContent) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+      const files = await fetchAllPlans({ forceRefresh: options?.forceRefresh });
       const parsed = files
         .map(f => parsePlanFile(f.content, f.filename))
         .sort((a, b) => a.meta.week_start.localeCompare(b.meta.week_start));
@@ -116,6 +121,7 @@ export default function ListViewPage() {
       setError('Failed to load plans. Check your backend connection.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
@@ -146,6 +152,14 @@ export default function ListViewPage() {
     <div className="lv-page">
       <div className="lv-header">
         <h2 className="lv-title">Plan</h2>
+        <button
+          type="button"
+          className="btn-ghost lv-refresh-btn"
+          onClick={() => void loadPlans({ forceRefresh: true, preserveContent: true })}
+          disabled={loading || refreshing}
+        >
+          {refreshing ? 'Refreshing…' : 'Refresh from GitHub'}
+        </button>
         <div className="lv-filters" role="group" aria-label="Filter by category">
           {FILTER_OPTIONS.map(opt => (
             <button

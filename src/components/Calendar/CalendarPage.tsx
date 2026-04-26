@@ -115,6 +115,7 @@ type EventModalState =
 export default function CalendarPage() {
   const [weeks, setWeeks] = useState<PlanWeek[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Coach-entry note modal
@@ -131,10 +132,14 @@ export default function CalendarPage() {
   // User-event CRUD modal
   const [eventModal, setEventModal] = useState<EventModalState>(null);
 
-  const loadPlans = useCallback(async () => {
+  const loadPlans = useCallback(async (options?: { forceRefresh?: boolean; preserveContent?: boolean }) => {
     try {
-      setLoading(true);
-      const planFiles = await fetchAllPlans();
+      if (options?.preserveContent) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+      const planFiles = await fetchAllPlans({ forceRefresh: options?.forceRefresh });
       const parsed = planFiles.map(f => parsePlanFile(f.content, f.filename));
       setWeeks(parsed);
       setError(null);
@@ -143,6 +148,7 @@ export default function CalendarPage() {
       setError('Failed to load plan files. Check your backend connection.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
@@ -387,10 +393,20 @@ export default function CalendarPage() {
   return (
     <div className="calendar-page">
       <div className="page-header">
-        <h2>Training Calendar</h2>
-        <p className="page-subtitle">
-          {weeks.length} week{weeks.length !== 1 ? 's' : ''} loaded &mdash; click a time slot, month day, or weekly all-day row to add an event
-        </p>
+        <div>
+          <h2>Training Calendar</h2>
+          <p className="page-subtitle">
+            {weeks.length} week{weeks.length !== 1 ? 's' : ''} loaded &mdash; click a time slot, month day, or weekly all-day row to add an event
+          </p>
+        </div>
+        <button
+          type="button"
+          className="btn-ghost page-refresh-btn"
+          onClick={() => void loadPlans({ forceRefresh: true, preserveContent: true })}
+          disabled={loading || refreshing}
+        >
+          {refreshing ? 'Refreshing…' : 'Refresh from GitHub'}
+        </button>
       </div>
 
       <div className="calendar-legend">
