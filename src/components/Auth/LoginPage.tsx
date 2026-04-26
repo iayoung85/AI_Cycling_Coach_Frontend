@@ -51,9 +51,22 @@ export default function LoginPage({ error, isLoading = false, onLogin }: Props) 
         </div>
 
         <form className="login-form" onSubmit={handleSubmit}>
+          <label className="login-sr-only" htmlFor="username">Username</label>
+          <input
+            id="username"
+            name="username"
+            type="text"
+            autoComplete="username"
+            className="login-sr-only"
+            defaultValue="isaac"
+            tabIndex={-1}
+            readOnly
+          />
+
           <label htmlFor="password">Password</label>
           <input
             id="password"
+            name="password"
             type="password"
             autoComplete="current-password"
             value={password}
