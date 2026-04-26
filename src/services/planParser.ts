@@ -3,6 +3,103 @@ import type { PlanMeta, PlanEntry, PlanWeek, Category, WorkoutDetails } from '..
 
 const VALID_CATEGORIES: Category[] = ['Workout', 'Life', 'Work', 'Note', 'Checkin'];
 
+function toFiniteNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return undefined;
+}
+
+function stringifyWorkoutStructureValue(value: unknown): string {
+  if (typeof value === 'string') {
+    return value.trim();
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .map(stringifyWorkoutStructureValue)
+      .filter(Boolean)
+      .join(', ');
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>)
+      .map(([key, nestedValue]) => {
+        const renderedValue = stringifyWorkoutStructureValue(nestedValue);
+        return renderedValue ? `${key}: ${renderedValue}` : key;
+      })
+      .filter(Boolean)
+      .join(', ');
+  }
+
+  return '';
+}
+
+function normalizeWorkoutStructure(structure: unknown): string[] | undefined {
+  const rawSteps = Array.isArray(structure)
+    ? structure
+    : structure == null
+      ? []
+      : [structure];
+
+  const normalizedSteps = rawSteps
+    .map(stringifyWorkoutStructureValue)
+    .map(step => step.trim())
+    .filter(Boolean);
+
+  return normalizedSteps.length > 0 ? normalizedSteps : undefined;
+}
+
+export function normalizeWorkoutDetails(value: unknown): WorkoutDetails | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+
+  const rawWorkout = value as Record<string, unknown>;
+  const workout: WorkoutDetails = {};
+
+  if (typeof rawWorkout.type === 'string' && rawWorkout.type.trim()) {
+    workout.type = rawWorkout.type.trim();
+  }
+
+  const durationMinutes = toFiniteNumber(rawWorkout.duration_minutes);
+  if (durationMinutes != null) {
+    workout.duration_minutes = durationMinutes;
+  }
+
+  if (typeof rawWorkout.intensity === 'string' && rawWorkout.intensity.trim()) {
+    workout.intensity = rawWorkout.intensity.trim();
+  }
+
+  const tssPlanned = toFiniteNumber(rawWorkout.tss_planned);
+  if (tssPlanned != null) {
+    workout.tss_planned = tssPlanned;
+  }
+
+  const structure = normalizeWorkoutStructure(rawWorkout.structure);
+  if (structure) {
+    workout.structure = structure;
+  }
+
+  if (typeof rawWorkout.notes === 'string' && rawWorkout.notes.trim()) {
+    workout.notes = rawWorkout.notes.trim();
+  }
+
+  return Object.keys(workout).length > 0 ? workout : undefined;
+}
+
 /** Parse YAML frontmatter from a markdown string */
 function parseFrontmatter(raw: string): { meta: Record<string, unknown>; body: string } {
   const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
@@ -106,7 +203,7 @@ export function parsePlanFile(raw: string, filename: string): PlanWeek {
           }
           i++; // skip closing ```
           try {
-            workoutYaml = parseYaml(yamlBlock) as WorkoutDetails;
+            workoutYaml = normalizeWorkoutDetails(parseYaml(yamlBlock));
           } catch {
             // If YAML parsing fails, just skip it
           }

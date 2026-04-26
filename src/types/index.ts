@@ -52,9 +52,9 @@ export type Category = 'Workout' | 'Life' | 'Work' | 'Note' | 'Checkin';
 
 // Structured workout fields from yaml code block
 export interface WorkoutDetails {
-  type: string;
-  duration_minutes: number;
-  intensity: string;
+  type?: string;
+  duration_minutes?: number;
+  intensity?: string;
   tss_planned?: number;
   structure?: string[];
   notes?: string;

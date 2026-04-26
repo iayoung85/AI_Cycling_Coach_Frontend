@@ -13,8 +13,8 @@ import {
   deleteEvent,
   rescheduleCoachEntry,
 } from '../../services/api';
-import { parsePlanFile } from '../../services/planParser';
-import type { PlanWeek, PlanEntry, Category, WorkoutDetails, UserEventPayload, UserEventResponse } from '../../types';
+import { parsePlanFile, normalizeWorkoutDetails } from '../../services/planParser';
+import type { PlanWeek, PlanEntry, Category, UserEventPayload, UserEventResponse } from '../../types';
 import EventModal from './EventModal';
 import './CalendarPage.css';
 
@@ -72,7 +72,7 @@ function buildEntriesFromResponse(result: UserEventResponse): PlanEntry[] {
     category: result.category as Category,
     title: result.title,
     description: result.notes ?? '',
-    workoutYaml: (result.workout_details as WorkoutDetails) ?? undefined,
+    workoutYaml: normalizeWorkoutDetails(result.workout_details),
     athleteNotes: [],
     date,
     allDay: result.all_day,
@@ -439,9 +439,15 @@ export default function CalendarPage() {
 
             {noteEntry.workoutYaml && (
               <div className="workout-details">
-                <p><strong>Type:</strong> {noteEntry.workoutYaml.type}</p>
-                <p><strong>Duration:</strong> {noteEntry.workoutYaml.duration_minutes} min</p>
-                <p><strong>Intensity:</strong> {noteEntry.workoutYaml.intensity}</p>
+                {noteEntry.workoutYaml.type && (
+                  <p><strong>Type:</strong> {noteEntry.workoutYaml.type}</p>
+                )}
+                {noteEntry.workoutYaml.duration_minutes != null && (
+                  <p><strong>Duration:</strong> {noteEntry.workoutYaml.duration_minutes} min</p>
+                )}
+                {noteEntry.workoutYaml.intensity && (
+                  <p><strong>Intensity:</strong> {noteEntry.workoutYaml.intensity}</p>
+                )}
                 {noteEntry.workoutYaml.tss_planned != null && (
                   <p><strong>TSS:</strong> {noteEntry.workoutYaml.tss_planned}</p>
                 )}
