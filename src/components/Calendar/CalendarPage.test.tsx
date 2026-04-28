@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { Children, cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as api from '../../services/api';
@@ -16,7 +17,23 @@ type MockCalendarEvent = {
 };
 
 type MockCalendarProps = {
+  initialView?: string;
   events?: MockCalendarEvent[];
+  dateClick?: (arg: {
+    date: Date;
+    allDay: boolean;
+    jsEvent: { target: EventTarget | null };
+    view: { type: string };
+  }) => void;
+  datesSet?: (arg: {
+    start: Date;
+    view: { type: string };
+  }) => void;
+  dayCellContent?: (arg: {
+    date: Date;
+    dayNumberText: string;
+    view: { type: string };
+  }) => ReactNode;
   eventClick?: (arg: {
     event: {
       extendedProps: MockCalendarEvent['extendedProps'];
@@ -26,28 +43,92 @@ type MockCalendarProps = {
   }) => void;
 };
 
+function attachSummaryDateClick(
+  node: ReactNode,
+  dateClick: MockCalendarProps['dateClick'] | undefined,
+  anchorDate: Date,
+): ReactNode {
+  if (!isValidElement(node)) {
+    return node;
+  }
+
+  const element = node as ReactElement<{
+    children?: ReactNode;
+    className?: string;
+    onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void;
+  }>;
+
+  const nextChildren = element.props.children == null
+    ? element.props.children
+    : Children.map(element.props.children, child => attachSummaryDateClick(child, dateClick, anchorDate));
+
+  if (element.props.className === 'month-summary-badge') {
+    return cloneElement(element, {
+      onClick: (event) => {
+        element.props.onClick?.(event);
+        dateClick?.({
+          date: anchorDate,
+          allDay: true,
+          jsEvent: { target: event.currentTarget },
+          view: { type: 'dayGridMonth' },
+        });
+      },
+    });
+  }
+
+  if (nextChildren !== element.props.children) {
+    return cloneElement(element, { children: nextChildren });
+  }
+
+  return element;
+}
+
 vi.mock('@fullcalendar/react', () => ({
-  default: ({ events = [], eventClick }: MockCalendarProps) => (
-    <div data-testid="mock-calendar">
-      {events.map(event => (
-        <button
-          key={event.id}
-          type="button"
-          onClick={() =>
-            eventClick?.({
-              event: {
-                extendedProps: event.extendedProps,
-                allDay: Boolean(event.allDay),
-                start: event.start ? new Date(event.start) : null,
-              },
-            })
-          }
-        >
-          {event.title}
-        </button>
-      ))}
-    </div>
-  ),
+  default: ({ initialView, events = [], dateClick, datesSet, dayCellContent, eventClick }: MockCalendarProps) => {
+    const anchorDate = events[0]?.start ? new Date(events[0].start) : new Date('2026-05-04T09:00:00');
+    const monthCell = initialView === 'dayGridMonth' && dayCellContent
+      ? attachSummaryDateClick(
+          dayCellContent({
+            date: anchorDate,
+            dayNumberText: String(anchorDate.getDate()),
+            view: { type: 'dayGridMonth' },
+          }),
+          dateClick,
+          anchorDate,
+        )
+      : null;
+
+    return (
+      <div data-testid="mock-calendar">
+        {monthCell && <div data-testid="mock-month-cell">{monthCell}</div>}
+        {datesSet && (
+          <button
+            type="button"
+            onClick={() => datesSet({ start: anchorDate, view: { type: 'timeGridDay' } })}
+          >
+            Switch to day view
+          </button>
+        )}
+        {events.map(event => (
+          <button
+            key={event.id}
+            type="button"
+            onClick={() =>
+              eventClick?.({
+                event: {
+                  extendedProps: event.extendedProps,
+                  allDay: Boolean(event.allDay),
+                  start: event.start ? new Date(event.start) : null,
+                },
+              })
+            }
+          >
+            {event.title}
+          </button>
+        ))}
+      </div>
+    );
+  },
 }));
 
 vi.mock('@fullcalendar/daygrid', () => ({ default: {} }));
@@ -72,6 +153,12 @@ const workoutPlan = [
   'week_number: 1.3',
   '---',
   '',
+  '# Week of 2026-05-04',
+  '',
+  'Smooth build week. Keep the volume steady and avoid turning Tuesday into a race.',
+  '',
+  '---',
+  '',
   '## 2026-05-04 (Monday)',
   '',
   '### 09:00 — Workout: Easy Endurance Ride — Back to It',
@@ -94,12 +181,22 @@ const workoutPlan = [
 describe('CalendarPage', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    window.innerWidth = 1024;
     fetchAllPlansMock.mockResolvedValue([
       {
         filename: 'week-2026-05-04.md',
         content: workoutPlan,
       },
     ]);
+  });
+
+  it('shows the current week summary above the weekly calendar', async () => {
+    render(<CalendarPage />);
+
+    expect(await screen.findByText('Week Summary')).toBeInTheDocument();
+    expect(
+      screen.getByText('Smooth build week. Keep the volume steady and avoid turning Tuesday into a race.')
+    ).toBeInTheDocument();
   });
 
   it('opens the workout modal for canonical structured workout yaml without crashing', async () => {
@@ -125,5 +222,46 @@ describe('CalendarPage', () => {
       expect(fetchAllPlansMock).toHaveBeenNthCalledWith(1, { forceRefresh: undefined });
       expect(fetchAllPlansMock).toHaveBeenNthCalledWith(2, { forceRefresh: true });
     });
+  });
+
+  it('opens a week summary modal from the monday badge in month view without opening add event first', async () => {
+    const originalWidth = window.innerWidth;
+    window.innerWidth = 500;
+
+    try {
+      render(<CalendarPage />);
+
+      const summaryButton = await screen.findByRole('button', {
+        name: 'View summary for week of 2026-05-04',
+      });
+      fireEvent.click(summaryButton);
+
+      expect(await screen.findByRole('dialog', { name: 'Week of 2026-05-04' })).toBeInTheDocument();
+      expect(screen.queryByText('Add Event')).not.toBeInTheDocument();
+      expect(
+        screen.getAllByText('Smooth build week. Keep the volume steady and avoid turning Tuesday into a race.')
+      ).not.toHaveLength(0);
+    } finally {
+      window.innerWidth = originalWidth;
+    }
+  });
+
+  it('shows a weekly summary button in mobile day view', async () => {
+    const originalWidth = window.innerWidth;
+    window.innerWidth = 500;
+
+    try {
+      render(<CalendarPage />);
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Switch to day view' }));
+
+      const weeklySummaryButton = await screen.findByRole('button', { name: 'Weekly Summary' });
+      fireEvent.click(weeklySummaryButton);
+
+      expect(await screen.findByRole('dialog', { name: 'Week of 2026-05-04' })).toBeInTheDocument();
+      expect(screen.queryByText('Add Event')).not.toBeInTheDocument();
+    } finally {
+      window.innerWidth = originalWidth;
+    }
   });
 });

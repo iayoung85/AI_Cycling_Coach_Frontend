@@ -107,6 +107,39 @@ function parseFrontmatter(raw: string): { meta: Record<string, unknown>; body: s
   return { meta: parseYaml(match[1]) ?? {}, body: match[2] };
 }
 
+function extractWeekSummary(lines: string[]): string {
+  const firstDayIndex = lines.findIndex(line => line.match(/^## (\d{4}-\d{2}-\d{2})\s+\((\w+)\)/));
+  const summaryLines = [...(firstDayIndex >= 0 ? lines.slice(0, firstDayIndex) : lines)];
+
+  while (summaryLines.length > 0 && summaryLines[0].trim() === '') {
+    summaryLines.shift();
+  }
+
+  if (summaryLines[0]?.match(/^#\s+/)) {
+    summaryLines.shift();
+  }
+
+  while (summaryLines.length > 0) {
+    const firstLine = summaryLines[0].trim();
+    if (firstLine === '' || firstLine === '---') {
+      summaryLines.shift();
+      continue;
+    }
+    break;
+  }
+
+  while (summaryLines.length > 0) {
+    const lastLine = summaryLines[summaryLines.length - 1].trim();
+    if (lastLine === '' || lastLine === '---') {
+      summaryLines.pop();
+      continue;
+    }
+    break;
+  }
+
+  return summaryLines.join('\n').trim();
+}
+
 /** Parse a full plan week file into structured data */
 export function parsePlanFile(raw: string, filename: string): PlanWeek {
   const { meta, body } = parseFrontmatter(raw);
@@ -123,6 +156,7 @@ export function parsePlanFile(raw: string, filename: string): PlanWeek {
 
   // Split into lines for parsing
   const lines = body.split('\n');
+  const summary = extractWeekSummary(lines);
   let i = 0;
 
   while (i < lines.length) {
@@ -243,5 +277,5 @@ export function parsePlanFile(raw: string, filename: string): PlanWeek {
     i++;
   }
 
-  return { meta: planMeta, filename, entries };
+  return { meta: planMeta, filename, summary, entries };
 }

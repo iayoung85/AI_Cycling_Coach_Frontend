@@ -32,6 +32,20 @@ const CATEGORY_COLORS: Record<string, string> = {
   Checkin: '#06b6d4',
 };
 
+function buildWeekSummaryMeta(week: PlanWeek): string {
+  return [
+    week.meta.training_block,
+    week.meta.week_number ? `Week ${week.meta.week_number}` : '',
+    week.meta.season,
+  ]
+    .filter(Boolean)
+    .join(' • ');
+}
+
+function clickedWeekSummaryBadge(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest('.month-summary-badge') !== null;
+}
+
 function getMondayOf(dateStr: string): string {
   const [y, m, d] = dateStr.split('-').map(Number);
   const date = new Date(y, m - 1, d);
@@ -126,6 +140,11 @@ export default function CalendarPage() {
   const [isMobile, setIsMobile] = useState(() => (
     typeof window !== 'undefined' ? window.innerWidth < 768 : false
   ));
+  const [currentViewType, setCurrentViewType] = useState(() => (
+    typeof window !== 'undefined' && window.innerWidth < 768 ? 'dayGridMonth' : 'timeGridWeek'
+  ));
+  const [visibleWeekStart, setVisibleWeekStart] = useState<string | null>(null);
+  const [summaryModalWeek, setSummaryModalWeek] = useState<PlanWeek | null>(null);
 
   // Coach-entry note modal
   const [noteEntry, setNoteEntry] = useState<PlanEntry | null>(null);
@@ -154,6 +173,12 @@ export default function CalendarPage() {
   }, []);
 
   useEffect(() => { loadPlans(); }, [loadPlans]);
+
+  useEffect(() => {
+    if (!visibleWeekStart && weeks.length > 0) {
+      setVisibleWeekStart(weeks[0].meta.week_start);
+    }
+  }, [visibleWeekStart, weeks]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -221,6 +246,10 @@ export default function CalendarPage() {
   };
 
   const handleDateClick = (info: DateClickArg) => {
+    if (clickedWeekSummaryBadge(info.jsEvent.target)) {
+      return;
+    }
+
     const date = dateFromStart(info.date);
     const time = info.allDay ? '09:00' : timeFromStart(info.date);
     setEventModal({ mode: 'create', date, time, allDay: info.allDay });
@@ -343,6 +372,10 @@ export default function CalendarPage() {
   const calendarToolbar = isMobile
     ? { left: 'prev,next', center: 'title', right: 'dayGridMonth,timeGridDay' }
     : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek' };
+  const weeksByStart = new Map(weeks.map(week => [week.meta.week_start, week]));
+  const visibleWeek = (visibleWeekStart ? weeksByStart.get(visibleWeekStart) : undefined) ?? weeks[0] ?? null;
+  const visibleWeekMeta = visibleWeek ? buildWeekSummaryMeta(visibleWeek) : '';
+  const showDaySummaryButton = currentViewType === 'timeGridDay' && visibleWeek;
 
   if (loading) return <div className="calendar-page"><p>Loading plans…</p></div>;
 
@@ -366,14 +399,26 @@ export default function CalendarPage() {
             {weeks.length} week{weeks.length !== 1 ? 's' : ''} loaded &mdash; click a time slot, month day, or weekly all-day row to add an event
           </p>
         </div>
-        <button
-          type="button"
-          className="btn-ghost page-refresh-btn"
-          onClick={() => void loadPlans({ forceRefresh: true, preserveContent: true })}
-          disabled={loading || refreshing}
-        >
-          {refreshing ? 'Refreshing…' : 'Refresh from GitHub'}
-        </button>
+        <div className="page-actions">
+          <button
+            type="button"
+            className="btn-ghost page-refresh-btn"
+            onClick={() => void loadPlans({ forceRefresh: true, preserveContent: true })}
+            disabled={loading || refreshing}
+          >
+            {refreshing ? 'Refreshing…' : 'Refresh from GitHub'}
+          </button>
+
+          {showDaySummaryButton && (
+            <button
+              type="button"
+              className="btn-ghost week-summary-trigger"
+              onClick={() => setSummaryModalWeek(visibleWeek)}
+            >
+              Weekly Summary
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="calendar-legend">
@@ -384,6 +429,24 @@ export default function CalendarPage() {
           </span>
         ))}
       </div>
+
+      {currentViewType === 'timeGridWeek' && visibleWeek && (
+        <section className="week-summary-panel" aria-labelledby="week-summary-heading">
+          <div className="week-summary-header">
+            <div>
+              <p className="week-summary-eyebrow">Week Summary</p>
+              <h3 id="week-summary-heading">Week of {visibleWeek.meta.week_start}</h3>
+              {visibleWeekMeta && <p className="week-summary-meta">{visibleWeekMeta}</p>}
+            </div>
+          </div>
+
+          {visibleWeek.summary ? (
+            <div className="week-summary-text">{visibleWeek.summary}</div>
+          ) : (
+            <p className="week-summary-empty">No week summary written for this week yet.</p>
+          )}
+        </section>
+      )}
 
       <div className="calendar-wrapper">
         <FullCalendar
@@ -404,6 +467,42 @@ export default function CalendarPage() {
           slotMaxTime="23:00:00"
           nowIndicator={true}
           scrollTime="06:00:00"
+          datesSet={(info) => {
+            setCurrentViewType(info.view.type);
+
+            if (info.view.type === 'timeGridWeek' || info.view.type === 'timeGridDay') {
+              setVisibleWeekStart(getMondayOf(dateFromStart(info.start)));
+            }
+          }}
+          dayCellContent={(info) => {
+            if (info.view.type !== 'dayGridMonth') {
+              return info.dayNumberText;
+            }
+
+            const date = dateFromStart(info.date);
+            const week = info.date.getDay() === 1 ? weeksByStart.get(date) : undefined;
+
+            return (
+              <div className="month-day-cell">
+                <span className="month-day-number">{info.dayNumberText}</span>
+                {week?.summary && (
+                  <button
+                    type="button"
+                    className="month-summary-badge"
+                    aria-label={`View summary for week of ${week.meta.week_start}`}
+                    onMouseDown={(event) => event.stopPropagation()}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setSummaryModalWeek(week);
+                    }}
+                  >
+                    Summary
+                  </button>
+                )}
+              </div>
+            );
+          }}
         />
       </div>
 
@@ -413,6 +512,35 @@ export default function CalendarPage() {
           onClose={() => setNoteEntry(null)}
           onSubmitNote={handleSubmitNote}
         />
+      )}
+
+      {summaryModalWeek && (
+        <div className="modal-overlay" onClick={() => setSummaryModalWeek(null)}>
+          <div
+            className="modal week-summary-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="week-summary-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 id="week-summary-modal-title">Week of {summaryModalWeek.meta.week_start}</h3>
+            {buildWeekSummaryMeta(summaryModalWeek) && (
+              <p className="week-summary-meta">{buildWeekSummaryMeta(summaryModalWeek)}</p>
+            )}
+
+            {summaryModalWeek.summary ? (
+              <div className="week-summary-text">{summaryModalWeek.summary}</div>
+            ) : (
+              <p className="week-summary-empty">No week summary written for this week yet.</p>
+            )}
+
+            <div className="modal-actions">
+              <button type="button" className="btn-primary" onClick={() => setSummaryModalWeek(null)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* User event create / edit modal */}

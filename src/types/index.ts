@@ -74,6 +74,7 @@ export interface WorkoutDetails {
 export interface PlanWeek {
   meta: PlanMeta;
   filename: string;
+  summary: string;
   entries: PlanEntry[];
 }
 
