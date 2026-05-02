@@ -137,6 +137,7 @@ export default function CalendarPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [syncWarning, setSyncWarning] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(() => (
     typeof window !== 'undefined' ? window.innerWidth < 768 : false
   ));
@@ -159,10 +160,11 @@ export default function CalendarPage() {
       } else {
         setLoading(true);
       }
-      const planFiles = await fetchAllPlans({ forceRefresh: options?.forceRefresh });
+      const { plans: planFiles, syncWarning: warning } = await fetchAllPlans({ forceRefresh: options?.forceRefresh });
       const parsed = planFiles.map(f => parsePlanFile(f.content, f.filename));
       setWeeks(parsed);
       setError(null);
+      setSyncWarning(warning ?? null);
     } catch (err) {
       console.error('Failed to load plans:', err);
       setError('Failed to load plan files. Check your backend connection.');
@@ -392,6 +394,11 @@ export default function CalendarPage() {
 
   return (
     <div className="calendar-page">
+      {syncWarning && (
+        <div className="sync-warning-banner">
+          ⚠️ Repo sync issue — plans may be stale. Check for unpushed local commits or merge conflicts: <em>{syncWarning}</em>
+        </div>
+      )}
       <div className="page-header">
         <div>
           <h2>Training Calendar</h2>

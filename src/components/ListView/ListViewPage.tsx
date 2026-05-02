@@ -106,6 +106,7 @@ export default function ListViewPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [syncWarning, setSyncWarning] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterOption>('All');
   const [selectedEntry, setSelectedEntry] = useState<PlanEntry | null>(null);
 
@@ -116,12 +117,13 @@ export default function ListViewPage() {
       } else {
         setLoading(true);
       }
-      const files = await fetchAllPlans({ forceRefresh: options?.forceRefresh });
+      const { plans: files, syncWarning: warning } = await fetchAllPlans({ forceRefresh: options?.forceRefresh });
       const parsed = files
         .map(f => parsePlanFile(f.content, f.filename))
         .sort((a, b) => a.meta.week_start.localeCompare(b.meta.week_start));
       setWeeks(parsed);
       setError(null);
+      setSyncWarning(warning ?? null);
     } catch (err) {
       console.error('Failed to load plans:', err);
       setError('Failed to load plans. Check your backend connection.');
@@ -182,6 +184,11 @@ export default function ListViewPage() {
 
   return (
     <div className="lv-page">
+      {syncWarning && (
+        <div className="sync-warning-banner">
+          ⚠️ Repo sync issue — plans may be stale. Check for unpushed local commits or merge conflicts: <em>{syncWarning}</em>
+        </div>
+      )}
       <div className="lv-header">
         <h2 className="lv-title">Plan</h2>
         <button

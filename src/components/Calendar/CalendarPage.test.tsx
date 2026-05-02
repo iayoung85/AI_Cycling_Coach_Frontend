@@ -182,12 +182,14 @@ describe('CalendarPage', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     window.innerWidth = 1024;
-    fetchAllPlansMock.mockResolvedValue([
-      {
-        filename: 'week-2026-05-04.md',
-        content: workoutPlan,
-      },
-    ]);
+    fetchAllPlansMock.mockResolvedValue({
+      plans: [
+        {
+          filename: 'week-2026-05-04.md',
+          content: workoutPlan,
+        },
+      ],
+    });
   });
 
   it('shows the current week summary above the weekly calendar', async () => {

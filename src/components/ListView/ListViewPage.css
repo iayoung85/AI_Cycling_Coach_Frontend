@@ -5,6 +5,24 @@
   gap: var(--space-xl);
 }
 
+.sync-warning-banner {
+  background: #78350f;
+  border: 1px solid #d97706;
+  color: #fef3c7;
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.sync-warning-banner em {
+  font-style: normal;
+  opacity: 0.8;
+  font-size: 0.8rem;
+  display: block;
+  margin-top: 4px;
+}
+
 /* ── Header + Filters ────────────────────────────────────── */
 .lv-header {
   display: flex;

@@ -28,12 +28,14 @@ const workoutPlan = [
 describe('ListViewPage', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    fetchAllPlansMock.mockResolvedValue([
-      {
-        filename: 'week-2026-05-04.md',
-        content: workoutPlan,
-      },
-    ]);
+    fetchAllPlansMock.mockResolvedValue({
+      plans: [
+        {
+          filename: 'week-2026-05-04.md',
+          content: workoutPlan,
+        },
+      ],
+    });
   });
 
   it('force refreshes plans from GitHub when requested', async () => {

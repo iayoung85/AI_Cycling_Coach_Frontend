@@ -91,7 +91,7 @@ async function ensureWeeksExistForEvent(date: string, payload: Partial<UserEvent
   const mondayDates = [...new Set(targetDates.map(getMondayOf))];
   const existingPlans = await fetchAllPlans();
   const existingWeeks = new Set(
-    existingPlans
+    existingPlans.plans
       .map(plan => plan.filename.match(/^week-(\d{4}-\d{2}-\d{2})\.md$/)?.[1])
       .filter((weekDate): weekDate is string => Boolean(weekDate))
   );
@@ -217,12 +217,12 @@ async function apiFetch(endpoint: string, options: RequestInit = {}) {
 }
 
 /** Fetch all plan files from backend */
-export async function fetchAllPlans(options?: { forceRefresh?: boolean }): Promise<Array<{ filename: string; content: string }>> {
-  const endpoint = options?.forceRefresh ? '/api/plans?force_refresh=1' : '/api/plans';
+export async function fetchAllPlans(_options?: { forceRefresh?: boolean }): Promise<{ plans: Array<{ filename: string; content: string }>; syncWarning?: string }> {
+  const endpoint = '/api/plans';
   const response = await apiFetch(endpoint);
   if (!response.ok) throw new Error(`Failed to fetch plans: ${response.status}`);
   const data = await response.json();
-  return data.plans || [];
+  return { plans: data.plans || [], syncWarning: data.sync_warning };
 }
 
 /** Submit athlete notes for a specific date */
