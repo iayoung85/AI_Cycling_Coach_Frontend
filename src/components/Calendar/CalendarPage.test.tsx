@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { Children, cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -214,16 +214,12 @@ describe('CalendarPage', () => {
     expect(screen.getByText('main: 40min Z2, steady rhythmic pedaling, 85-95rpm')).toBeInTheDocument();
   });
 
-  it('force refreshes plans from GitHub when the refresh button is clicked', async () => {
+  it('fetches plans on initial load', async () => {
     render(<CalendarPage />);
 
     await screen.findByRole('button', { name: 'Easy Endurance Ride — Back to It' });
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh from GitHub' }));
 
-    await waitFor(() => {
-      expect(fetchAllPlansMock).toHaveBeenNthCalledWith(1, { forceRefresh: undefined });
-      expect(fetchAllPlansMock).toHaveBeenNthCalledWith(2, { forceRefresh: true });
-    });
+    expect(fetchAllPlansMock).toHaveBeenCalledTimes(1);
   });
 
   it('opens a week summary modal from the monday badge in month view without opening add event first', async () => {

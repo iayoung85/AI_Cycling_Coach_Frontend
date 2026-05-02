@@ -104,20 +104,15 @@ function EntryCard({ entry, onSelect }: { entry: PlanEntry; onSelect: (entry: Pl
 export default function ListViewPage() {
   const [weeks, setWeeks] = useState<PlanWeek[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [syncWarning, setSyncWarning] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterOption>('All');
   const [selectedEntry, setSelectedEntry] = useState<PlanEntry | null>(null);
 
-  const loadPlans = useCallback(async (options?: { forceRefresh?: boolean; preserveContent?: boolean }) => {
+  const loadPlans = useCallback(async () => {
     try {
-      if (options?.preserveContent) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-      const { plans: files, syncWarning: warning } = await fetchAllPlans({ forceRefresh: options?.forceRefresh });
+      setLoading(true);
+      const { plans: files, syncWarning: warning } = await fetchAllPlans();
       const parsed = files
         .map(f => parsePlanFile(f.content, f.filename))
         .sort((a, b) => a.meta.week_start.localeCompare(b.meta.week_start));
@@ -129,7 +124,6 @@ export default function ListViewPage() {
       setError('Failed to load plans. Check your backend connection.');
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   }, []);
 
@@ -191,14 +185,6 @@ export default function ListViewPage() {
       )}
       <div className="lv-header">
         <h2 className="lv-title">Plan</h2>
-        <button
-          type="button"
-          className="btn-ghost lv-refresh-btn"
-          onClick={() => void loadPlans({ forceRefresh: true, preserveContent: true })}
-          disabled={loading || refreshing}
-        >
-          {refreshing ? 'Refreshing…' : 'Refresh from GitHub'}
-        </button>
         <div className="lv-filters" role="group" aria-label="Filter by category">
           {FILTER_OPTIONS.map(opt => (
             <button

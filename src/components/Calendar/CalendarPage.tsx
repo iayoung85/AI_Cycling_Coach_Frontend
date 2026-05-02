@@ -135,7 +135,6 @@ type EventModalState =
 export default function CalendarPage() {
   const [weeks, setWeeks] = useState<PlanWeek[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [syncWarning, setSyncWarning] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(() => (
@@ -153,14 +152,10 @@ export default function CalendarPage() {
   // User-event CRUD modal
   const [eventModal, setEventModal] = useState<EventModalState>(null);
 
-  const loadPlans = useCallback(async (options?: { forceRefresh?: boolean; preserveContent?: boolean }) => {
+  const loadPlans = useCallback(async () => {
     try {
-      if (options?.preserveContent) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-      const { plans: planFiles, syncWarning: warning } = await fetchAllPlans({ forceRefresh: options?.forceRefresh });
+      setLoading(true);
+      const { plans: planFiles, syncWarning: warning } = await fetchAllPlans();
       const parsed = planFiles.map(f => parsePlanFile(f.content, f.filename));
       setWeeks(parsed);
       setError(null);
@@ -170,7 +165,6 @@ export default function CalendarPage() {
       setError('Failed to load plan files. Check your backend connection.');
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   }, []);
 
@@ -407,15 +401,6 @@ export default function CalendarPage() {
           </p>
         </div>
         <div className="page-actions">
-          <button
-            type="button"
-            className="btn-ghost page-refresh-btn"
-            onClick={() => void loadPlans({ forceRefresh: true, preserveContent: true })}
-            disabled={loading || refreshing}
-          >
-            {refreshing ? 'Refreshing…' : 'Refresh from GitHub'}
-          </button>
-
           {showDaySummaryButton && (
             <button
               type="button"

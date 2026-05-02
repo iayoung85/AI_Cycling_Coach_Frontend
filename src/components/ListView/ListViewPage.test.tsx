@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import * as api from '../../services/api';
@@ -38,16 +38,12 @@ describe('ListViewPage', () => {
     });
   });
 
-  it('force refreshes plans from GitHub when requested', async () => {
+  it('fetches plans on initial load', async () => {
     render(<ListViewPage />);
 
     await screen.findByText('Easy Endurance Ride');
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh from GitHub' }));
 
-    await waitFor(() => {
-      expect(fetchAllPlansMock).toHaveBeenNthCalledWith(1, { forceRefresh: undefined });
-      expect(fetchAllPlansMock).toHaveBeenNthCalledWith(2, { forceRefresh: true });
-    });
+    expect(fetchAllPlansMock).toHaveBeenCalledTimes(1);
   });
 
   it('opens the shared entry detail modal from the list view', async () => {
