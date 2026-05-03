@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import type { UserEventPayload, UserEventCategory } from '../../types';
+import { useEffect, useState } from 'react';
+import { createFavorite, fetchFavorites } from '../../services/api';
+import type { FavoriteWorkout, UserEventPayload, UserEventCategory } from '../../types';
 
 interface InitialEventData {
   category: UserEventCategory;
@@ -14,6 +15,7 @@ interface InitialEventData {
     duration_minutes?: number;
     intensity?: string;
     tss_planned?: number;
+    structure?: string[];
     notes?: string;
   };
 }
@@ -52,11 +54,82 @@ export default function EventModal({
   );
   const [wIntensity, setWIntensity] = useState(initialData?.workoutDetails?.intensity ?? '');
   const [wTss, setWTss] = useState(initialData?.workoutDetails?.tss_planned?.toString() ?? '');
+  const [wStructure, setWStructure] = useState(initialData?.workoutDetails?.structure?.join('\n') ?? '');
   const [wNotes, setWNotes] = useState(initialData?.workoutDetails?.notes ?? '');
+  const [favoriteId, setFavoriteId] = useState('');
+  const [favorites, setFavorites] = useState<FavoriteWorkout[]>([]);
+  const [favoritesLoading, setFavoritesLoading] = useState(false);
+  const [favoritesError, setFavoritesError] = useState<string | null>(null);
+  const [savingFavorite, setSavingFavorite] = useState(false);
+  const [favoriteMessage, setFavoriteMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (mode !== 'create') {
+      return;
+    }
+
+    let active = true;
+
+    async function loadFavorites() {
+      try {
+        setFavoritesLoading(true);
+        const result = await fetchFavorites();
+        if (!active) {
+          return;
+        }
+        setFavorites(result.favorites);
+        setFavoritesError(null);
+      } catch (loadError) {
+        if (!active) {
+          return;
+        }
+        setFavoritesError(loadError instanceof Error ? loadError.message : 'Failed to load favorites');
+      } finally {
+        if (active) {
+          setFavoritesLoading(false);
+        }
+      }
+    }
+
+    void loadFavorites();
+
+    return () => {
+      active = false;
+    };
+  }, [mode]);
+
+  function applyFavoriteSelection(selectedFavorite: FavoriteWorkout) {
+    setFavoriteId(selectedFavorite.id);
+    setTitle(selectedFavorite.title);
+    setNotes(selectedFavorite.notes ?? '');
+    setWType(selectedFavorite.workout_details?.type ?? '');
+    setWDuration(selectedFavorite.workout_details?.duration_minutes?.toString() ?? '');
+    setWIntensity(selectedFavorite.workout_details?.intensity ?? '');
+    setWTss(selectedFavorite.workout_details?.tss_planned?.toString() ?? '');
+    setWStructure(selectedFavorite.workout_details?.structure?.join('\n') ?? '');
+    setWNotes(selectedFavorite.workout_details?.notes ?? '');
+    setError(null);
+  }
+
+  function buildWorkoutPayload() {
+    const structure = wStructure
+      .split('\n')
+      .map(step => step.trim())
+      .filter(Boolean);
+
+    return {
+      type: wType || 'ride',
+      duration_minutes: parseInt(wDuration) || 60,
+      intensity: wIntensity || 'easy',
+      tss_planned: wTss ? parseInt(wTss) : undefined,
+      structure: structure.length > 0 ? structure : undefined,
+      notes: wNotes.trim() || undefined,
+    };
+  }
 
   const handleSave = async () => {
     if (!title.trim()) { setError('Title is required'); return; }
@@ -77,13 +150,7 @@ export default function EventModal({
       start_date: startDate,
       end_date: allDay ? endDate : startDate,
       time: allDay ? undefined : time,
-      workout_details: category === 'Workout' ? {
-        type: wType || 'ride',
-        duration_minutes: parseInt(wDuration) || 60,
-        intensity: wIntensity || 'easy',
-        tss_planned: wTss ? parseInt(wTss) : undefined,
-        notes: wNotes.trim() || undefined,
-      } : undefined,
+      workout_details: category === 'Workout' ? buildWorkoutPayload() : undefined,
     };
 
     setSaving(true);
@@ -108,6 +175,35 @@ export default function EventModal({
     }
   };
 
+  const handleAddToFavorites = async () => {
+    if (category !== 'Workout') {
+      return;
+    }
+    if (!title.trim()) {
+      setFavoriteMessage({ type: 'error', text: 'Title is required to save a favorite.' });
+      return;
+    }
+
+    setSavingFavorite(true);
+    setFavoriteMessage(null);
+
+    try {
+      await createFavorite({
+        title: title.trim(),
+        notes: notes.trim() || undefined,
+        workout_details: buildWorkoutPayload(),
+      });
+      setFavoriteMessage({ type: 'success', text: 'Saved to favorites.' });
+    } catch (err) {
+      setFavoriteMessage({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Failed to save favorite',
+      });
+    } finally {
+      setSavingFavorite(false);
+    }
+  };
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal event-modal" onClick={e => e.stopPropagation()}>
@@ -117,8 +213,9 @@ export default function EventModal({
         <div className="event-form">
           <div className="form-row">
             <div className="form-group">
-              <label>Category</label>
+              <label htmlFor="event-category">Category</label>
               <select
+                id="event-category"
                 value={category}
                 onChange={e => setCategory(e.target.value as UserEventCategory)}
                 disabled={saving}
@@ -130,8 +227,8 @@ export default function EventModal({
                 <option value="Checkin">Checkin</option>
               </select>
             </div>
-            <div className="form-group">
-              <label className="checkbox-label">All-Day Event</label>
+            <div className="form-group checkbox-group">
+              <span className="checkbox-label">All-Day Event</span>
               <label className="checkbox-control">
                 <input
                   type="checkbox"
@@ -139,7 +236,10 @@ export default function EventModal({
                   onChange={e => setAllDay(e.target.checked)}
                   disabled={saving}
                 />
-                <span>Show in the calendar all-day area</span>
+                <span className="checkbox-copy">
+                  <strong>Show in all-day row</strong>
+                  <small>Place this event in the calendar&apos;s all-day area.</small>
+                </span>
               </label>
             </div>
           </div>
@@ -147,8 +247,9 @@ export default function EventModal({
           {allDay ? (
             <div className="form-row">
               <div className="form-group">
-                <label>Start Day</label>
+                <label htmlFor="event-start-day">Start Day</label>
                 <input
+                  id="event-start-day"
                   type="date"
                   value={startDate}
                   onChange={e => setStartDate(e.target.value)}
@@ -156,8 +257,9 @@ export default function EventModal({
                 />
               </div>
               <div className="form-group">
-                <label>End Day</label>
+                <label htmlFor="event-end-day">End Day</label>
                 <input
+                  id="event-end-day"
                   type="date"
                   value={endDate}
                   onChange={e => setEndDate(e.target.value)}
@@ -168,8 +270,9 @@ export default function EventModal({
           ) : (
             <div className="form-row">
               <div className="form-group">
-                <label>Day</label>
+                <label htmlFor="event-day">Day</label>
                 <input
+                  id="event-day"
                   type="date"
                   value={startDate}
                   onChange={e => setStartDate(e.target.value)}
@@ -177,8 +280,9 @@ export default function EventModal({
                 />
               </div>
               <div className="form-group">
-                <label>Time</label>
+                <label htmlFor="event-time">Time</label>
                 <input
+                  id="event-time"
                   type="time"
                   value={time}
                   onChange={e => setTime(e.target.value)}
@@ -189,8 +293,9 @@ export default function EventModal({
           )}
 
           <div className="form-group">
-            <label>Title</label>
+            <label htmlFor="event-title">Title</label>
             <input
+              id="event-title"
               type="text"
               placeholder="Event title"
               value={title}
@@ -201,8 +306,9 @@ export default function EventModal({
           </div>
 
           <div className="form-group">
-            <label>Notes</label>
+            <label htmlFor="event-notes">Notes</label>
             <textarea
+              id="event-notes"
               placeholder="Optional description…"
               value={notes}
               onChange={e => setNotes(e.target.value)}
@@ -213,10 +319,40 @@ export default function EventModal({
 
           {category === 'Workout' && (
             <div className="workout-fields">
+              {mode === 'create' && (
+                <div className="form-group">
+                  <label htmlFor="event-favorite">Start From Favorite</label>
+                  <select
+                    id="event-favorite"
+                    value={favoriteId}
+                    onChange={event => {
+                      const nextFavoriteId = event.target.value;
+                      setFavoriteId(nextFavoriteId);
+                      const selectedFavorite = favorites.find(item => item.id === nextFavoriteId);
+                      if (selectedFavorite) {
+                        applyFavoriteSelection(selectedFavorite);
+                      }
+                    }}
+                    disabled={saving || favoritesLoading || favorites.length === 0}
+                  >
+                    <option value="">
+                      {favoritesLoading ? 'Loading favorites…' : favorites.length > 0 ? 'Select a saved workout…' : 'No favorites yet'}
+                    </option>
+                    {favorites.map(favorite => (
+                      <option key={favorite.id} value={favorite.id}>
+                        {favorite.title} ({favorite.category})
+                      </option>
+                    ))}
+                  </select>
+                  {favoritesError && <p className="submit-message error">{favoritesError}</p>}
+                </div>
+              )}
+
               <div className="form-row">
                 <div className="form-group">
-                  <label>Type</label>
+                  <label htmlFor="event-workout-type">Type</label>
                   <input
+                    id="event-workout-type"
                     type="text"
                     placeholder="ride, run, strength…"
                     value={wType}
@@ -225,8 +361,9 @@ export default function EventModal({
                   />
                 </div>
                 <div className="form-group">
-                  <label>Intensity</label>
+                  <label htmlFor="event-workout-intensity">Intensity</label>
                   <select
+                    id="event-workout-intensity"
                     value={wIntensity}
                     onChange={e => setWIntensity(e.target.value)}
                     disabled={saving}
@@ -242,8 +379,9 @@ export default function EventModal({
               </div>
               <div className="form-row">
                 <div className="form-group">
-                  <label>Duration (min)</label>
+                  <label htmlFor="event-workout-duration">Duration (min)</label>
                   <input
+                    id="event-workout-duration"
                     type="number"
                     placeholder="60"
                     value={wDuration}
@@ -252,8 +390,9 @@ export default function EventModal({
                   />
                 </div>
                 <div className="form-group">
-                  <label>TSS</label>
+                  <label htmlFor="event-workout-tss">TSS</label>
                   <input
+                    id="event-workout-tss"
                     type="number"
                     placeholder="50"
                     value={wTss}
@@ -263,8 +402,20 @@ export default function EventModal({
                 </div>
               </div>
               <div className="form-group">
-                <label>Workout Notes</label>
+                <label htmlFor="event-workout-structure">Structure</label>
                 <textarea
+                  id="event-workout-structure"
+                  placeholder="One step per line"
+                  value={wStructure}
+                  onChange={e => setWStructure(e.target.value)}
+                  rows={5}
+                  disabled={saving}
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="event-workout-notes">Workout Notes</label>
+                <textarea
+                  id="event-workout-notes"
                   placeholder="Structure, targets…"
                   value={wNotes}
                   onChange={e => setWNotes(e.target.value)}
@@ -275,6 +426,9 @@ export default function EventModal({
             </div>
           )}
 
+          {favoriteMessage && (
+            <p className={`submit-message ${favoriteMessage.type}`}>{favoriteMessage.text}</p>
+          )}
           {error && <p className="submit-message error">{error}</p>}
         </div>
 
@@ -288,11 +442,20 @@ export default function EventModal({
               {deleting ? 'Deleting…' : 'Delete'}
             </button>
           )}
+          {mode === 'edit' && category === 'Workout' && (
+            <button
+              className="btn-ghost"
+              onClick={handleAddToFavorites}
+              disabled={saving || deleting || savingFavorite || !title.trim()}
+            >
+              {savingFavorite ? 'Saving Favorite…' : 'Add to Favorites'}
+            </button>
+          )}
           <div style={{ flex: 1 }} />
-          <button className="btn-ghost" onClick={onClose} disabled={saving || deleting}>
+          <button className="btn-ghost" onClick={onClose} disabled={saving || deleting || savingFavorite}>
             Cancel
           </button>
-          <button className="btn-primary" onClick={handleSave} disabled={saving || deleting || !title.trim()}>
+          <button className="btn-primary" onClick={handleSave} disabled={saving || deleting || savingFavorite || !title.trim()}>
             {saving ? 'Saving…' : mode === 'create' ? 'Add Event' : 'Save Changes'}
           </button>
         </div>

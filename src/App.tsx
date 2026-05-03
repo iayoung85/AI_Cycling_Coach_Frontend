@@ -3,6 +3,7 @@ import { BrowserRouter, HashRouter, Routes, Route } from 'react-router-dom';
 import LoginPage from './components/Auth/LoginPage';
 import AppLayout from './components/Layout/AppLayout';
 import CalendarPage from './components/Calendar/CalendarPage';
+import FavoritesPage from './components/Favorites/FavoritesPage';
 import ListViewPage from './components/ListView/ListViewPage';
 import RecurringPage from './components/Recurring/RecurringPage';
 import type { AuthUser } from './types';
@@ -102,6 +103,7 @@ function App() {
       <AppLayout user={user} isLocalMode={localMode} onLogout={localMode ? undefined : handleLogout}>
         <Routes>
           <Route path="/" element={<CalendarPage />} />
+          <Route path="/favorites" element={<FavoritesPage />} />
           <Route path="/list" element={<ListViewPage />} />
           <Route path="/recurring" element={<RecurringPage />} />
         </Routes>

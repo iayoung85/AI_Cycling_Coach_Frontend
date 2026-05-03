@@ -1,6 +1,9 @@
 import type {
   AuthSession,
   AuthUser,
+  FavoriteSchedulePayload,
+  FavoriteWorkout,
+  FavoriteWorkoutPayload,
   UserEventPayload,
   UserEventResponse,
   RecurrenceRule,
@@ -348,6 +351,86 @@ export async function rescheduleCoachEntry(
   if (!res.ok) {
     const error = await res.json().catch(() => ({}));
     throw new Error(error.error || `Failed to reschedule entry: ${res.status}`);
+  }
+  return res.json();
+}
+
+// ---------------------------------------------------------------------------
+// Favorites workouts
+// ---------------------------------------------------------------------------
+
+export async function fetchFavorites(): Promise<{ favorites: FavoriteWorkout[]; categories: string[] }> {
+  const res = await apiFetch('/api/favorites');
+  if (!res.ok) {
+    throw new Error(`Failed to fetch favorites: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function createFavorite(payload: FavoriteWorkoutPayload): Promise<FavoriteWorkout> {
+  const res = await apiFetch('/api/favorites', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.error || `Failed to create favorite: ${res.status}`);
+  }
+  const data = await res.json();
+  return data.favorite as FavoriteWorkout;
+}
+
+export async function updateFavorite(
+  favoriteId: string,
+  payload: Partial<FavoriteWorkoutPayload>,
+): Promise<FavoriteWorkout> {
+  const res = await apiFetch(`/api/favorites/${favoriteId}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.error || `Failed to update favorite: ${res.status}`);
+  }
+  const data = await res.json();
+  return data.favorite as FavoriteWorkout;
+}
+
+export async function deleteFavorite(favoriteId: string): Promise<void> {
+  const res = await apiFetch(`/api/favorites/${favoriteId}`, { method: 'DELETE' });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.error || `Failed to delete favorite: ${res.status}`);
+  }
+}
+
+export async function scheduleFavorite(
+  favoriteId: string,
+  payload: FavoriteSchedulePayload,
+): Promise<UserEventResponse> {
+  await ensureWeeksExistForEvent(payload.date, payload);
+
+  const res = await apiFetch(`/api/favorites/${favoriteId}/schedule`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
+  if (res.status === 404) {
+    await generateWeek(payload.date);
+    const retry = await apiFetch(`/api/favorites/${favoriteId}/schedule`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    if (!retry.ok) {
+      const error = await retry.json().catch(() => ({}));
+      throw new Error(error.error || `Failed to schedule favorite: ${retry.status}`);
+    }
+    return retry.json();
+  }
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.error || `Failed to schedule favorite: ${res.status}`);
   }
   return res.json();
 }

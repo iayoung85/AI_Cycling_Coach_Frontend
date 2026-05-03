@@ -5,7 +5,9 @@ import * as api from '../../services/api';
 import ListViewPage from './ListViewPage';
 
 vi.mock('../../services/api', () => ({
+  createFavorite: vi.fn(),
   fetchAllPlans: vi.fn(),
+  submitAthleteNote: vi.fn(),
 }));
 
 const fetchAllPlansMock = vi.mocked(api.fetchAllPlans);

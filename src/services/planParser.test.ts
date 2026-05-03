@@ -121,6 +121,80 @@ describe('planParser', () => {
 // ---------------------------------------------------------------------------
 
 describe('planParser — yaml block formats', () => {
+  it('does not absorb day separators into the last event notes and parses later same-day entries separately', () => {
+    const parsed = parsePlanFile(
+      [
+        '---',
+        'week_start: 2026-05-04',
+        'season: base',
+        'training_block: "Base"',
+        'week_number: 1.1',
+        '---',
+        '',
+        '# Week of 2026-05-04',
+        '',
+        '---',
+        '',
+        '## 2026-05-04 (Monday)',
+        '',
+        '### 07:00 — Workout: First Session',
+        '',
+        'Stay smooth.',
+        '',
+        '### 17:00 — Workout: Second Session',
+        '',
+        'Mobility only.',
+        '',
+        '---',
+        '',
+        '## 2026-05-05 (Tuesday)',
+        '',
+        '### REST DAY',
+      ].join('\n'),
+      'week-2026-05-04.md',
+    );
+
+    expect(parsed.entries).toHaveLength(3);
+    expect(parsed.entries[0].title).toBe('First Session');
+    expect(parsed.entries[0].description).toBe('Stay smooth.');
+    expect(parsed.entries[1].title).toBe('Second Session');
+    expect(parsed.entries[1].description).toBe('Mobility only.');
+  });
+
+  it('ignores favorite provenance comments in event bodies', () => {
+    const parsed = parsePlanFile(
+      [
+        '---',
+        'week_start: 2026-05-04',
+        'season: base',
+        'training_block: "Base"',
+        'week_number: 1.1',
+        '---',
+        '',
+        '# Week of 2026-05-04',
+        '',
+        '---',
+        '',
+        '## 2026-05-04 (Monday)',
+        '',
+        '### 09:00 — Workout: Favorite-Derived Session',
+        '<!-- event_id: test-id-001 -->',
+        '<!-- favorite_id: ftp-builder -->',
+        '',
+        'Copied forward from a favorite session.',
+        '',
+        '```yaml',
+        'type: ride',
+        'duration_minutes: 60',
+        '```',
+      ].join('\n'),
+      'week-2026-05-04.md',
+    );
+
+    expect(parsed.entries[0].description).toBe('Copied forward from a favorite session.');
+    expect(parsed.entries[0].eventId).toBe('test-id-001');
+  });
+
   it('parses block scalar notes written by the backend (|-)', () => {
     // pyyaml uses |- style for multi-line strings without a trailing newline
     const parsed = parsePlanFile(

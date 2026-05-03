@@ -58,6 +58,43 @@ export interface UserEventResponse {
   workout_details: Partial<WorkoutDetails> | null;
 }
 
+export type FavoriteWorkoutCategory =
+  | 'off-bike'
+  | 'FTP'
+  | 'endurance'
+  | 'HIIT'
+  | 'VO2-max'
+  | 'uncategorized'
+  | 'misc';
+
+export interface FavoriteWorkout {
+  id: string;
+  category: FavoriteWorkoutCategory;
+  title: string;
+  notes: string | null;
+  workout_details: Partial<WorkoutDetails> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FavoriteWorkoutPayload {
+  category?: FavoriteWorkoutCategory;
+  title: string;
+  notes?: string;
+  workout_details?: Partial<WorkoutDetails>;
+}
+
+export interface FavoriteSchedulePayload {
+  date: string;
+  time?: string;
+  all_day?: boolean;
+  start_date?: string;
+  end_date?: string;
+  title?: string;
+  notes?: string;
+  workout_details?: Partial<WorkoutDetails>;
+}
+
 export type Category = 'Workout' | 'Life' | 'Work' | 'Note' | 'Checkin';
 
 // Structured workout fields from yaml code block

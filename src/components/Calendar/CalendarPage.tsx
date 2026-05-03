@@ -6,6 +6,7 @@ import interactionPlugin from '@fullcalendar/interaction';
 import type { DateClickArg } from '@fullcalendar/interaction';
 import type { EventClickArg, EventDropArg } from '@fullcalendar/core';
 import {
+  createFavorite,
   fetchAllPlans,
   submitAthleteNote,
   createEvent,
@@ -22,6 +23,7 @@ import {
   type EntryDetailModalNotePayload,
 } from '../EntryDetail/entryNoteUtils';
 import EventModal from './EventModal';
+import { buildFavoritePayloadFromEntry } from '../Favorites/favoriteUtils';
 import './CalendarPage.css';
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -364,6 +366,10 @@ export default function CalendarPage() {
     }
   };
 
+  const handleAddToFavorites = async (entry: PlanEntry) => {
+    await createFavorite(buildFavoritePayloadFromEntry(entry));
+  };
+
   const calendarView = isMobile ? 'dayGridMonth' : 'timeGridWeek';
   const calendarToolbar = isMobile
     ? { left: 'prev,next', center: 'title', right: 'dayGridMonth,timeGridDay' }
@@ -503,6 +509,7 @@ export default function CalendarPage() {
           entry={noteEntry}
           onClose={() => setNoteEntry(null)}
           onSubmitNote={handleSubmitNote}
+          onAddToFavorites={handleAddToFavorites}
         />
       )}
 

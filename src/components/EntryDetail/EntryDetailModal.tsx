@@ -7,6 +7,7 @@ interface EntryDetailModalProps {
   entry: PlanEntry;
   onClose: () => void;
   onSubmitNote?: (payload: EntryDetailModalNotePayload) => Promise<void>;
+  onAddToFavorites?: (entry: PlanEntry) => Promise<void>;
 }
 
 function formatEntryMeta(entry: PlanEntry): string {
@@ -17,7 +18,12 @@ function formatEntryMeta(entry: PlanEntry): string {
   return `${entry.date} at ${entry.time}`;
 }
 
-export default function EntryDetailModal({ entry, onClose, onSubmitNote }: EntryDetailModalProps) {
+export default function EntryDetailModal({
+  entry,
+  onClose,
+  onSubmitNote,
+  onAddToFavorites,
+}: EntryDetailModalProps) {
   const [noteInput, setNoteInput] = useState('');
   const [actualDuration, setActualDuration] = useState('');
   const [freshness, setFreshness] = useState('');
@@ -25,6 +31,7 @@ export default function EntryDetailModal({ entry, onClose, onSubmitNote }: Entry
   const [rpe, setRpe] = useState('');
   const [stats, setStats] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [savingFavorite, setSavingFavorite] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
@@ -38,6 +45,7 @@ export default function EntryDetailModal({ entry, onClose, onSubmitNote }: Entry
   }, [entry.category, entry.date, entry.time, entry.title]);
 
   const canSubmit = Boolean(noteInput.trim() || actualDuration || freshness || difficulty || rpe || stats);
+  const canAddToFavorites = entry.category === 'Workout' && Boolean(onAddToFavorites);
 
   async function handleSubmit() {
     if (!onSubmitNote || !canSubmit) {
@@ -70,6 +78,27 @@ export default function EntryDetailModal({ entry, onClose, onSubmitNote }: Entry
       });
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleAddToFavorites() {
+    if (!onAddToFavorites) {
+      return;
+    }
+
+    setSavingFavorite(true);
+    setSubmitMessage(null);
+
+    try {
+      await onAddToFavorites(entry);
+      setSubmitMessage({ type: 'success', text: 'Saved to favorites.' });
+    } catch (error) {
+      setSubmitMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Failed to save favorite',
+      });
+    } finally {
+      setSavingFavorite(false);
     }
   }
 
@@ -205,12 +234,22 @@ export default function EntryDetailModal({ entry, onClose, onSubmitNote }: Entry
         )}
 
         <div className="entry-detail-actions">
+          {canAddToFavorites && (
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => void handleAddToFavorites()}
+              disabled={savingFavorite || submitting}
+            >
+              {savingFavorite ? 'Saving Favorite…' : 'Add to Favorites'}
+            </button>
+          )}
           {onSubmitNote && (
             <button
               type="button"
               className="btn-primary"
               onClick={() => void handleSubmit()}
-              disabled={submitting || !canSubmit}
+              disabled={submitting || savingFavorite || !canSubmit}
             >
               {submitting ? 'Submitting…' : 'Submit'}
             </button>

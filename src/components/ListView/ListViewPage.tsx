@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { fetchAllPlans, submitAthleteNote } from '../../services/api';
+import { createFavorite, fetchAllPlans, submitAthleteNote } from '../../services/api';
 import { parsePlanFile } from '../../services/planParser';
 import type { PlanWeek, PlanEntry, Category } from '../../types';
 import EntryDetailModal from '../EntryDetail/EntryDetailModal';
+import { buildFavoritePayloadFromEntry } from '../Favorites/favoriteUtils';
 import {
   applyAthleteNoteToWeeks,
   buildAthleteNoteRequest,
@@ -155,6 +156,10 @@ export default function ListViewPage() {
     }
   };
 
+  const handleAddToFavorites = async (entry: PlanEntry) => {
+    await createFavorite(buildFavoritePayloadFromEntry(entry));
+  };
+
   // Group entries by date, applying category filter (REST entries only shown when filter is 'All')
   const visibleWeeks = weeks
     .map(week => {
@@ -251,6 +256,7 @@ export default function ListViewPage() {
           entry={selectedEntry}
           onClose={() => setSelectedEntry(null)}
           onSubmitNote={selectedEntry.eventId ? undefined : handleSubmitNote}
+          onAddToFavorites={handleAddToFavorites}
         />
       )}
     </div>

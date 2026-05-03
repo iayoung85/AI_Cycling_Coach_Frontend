@@ -17,6 +17,7 @@ vi.mock('./components/Layout/AppLayout', () => ({
   default: ({ children }: { children: React.ReactNode }) => <div data-testid="layout">{children}</div>,
 }));
 vi.mock('./components/Calendar/CalendarPage', () => ({ default: () => <div>Calendar Page</div> }));
+vi.mock('./components/Favorites/FavoritesPage', () => ({ default: () => <div>Favorites Page</div> }));
 vi.mock('./components/ListView/ListViewPage', () => ({ default: () => <div>List Page</div> }));
 vi.mock('./components/Recurring/RecurringPage', () => ({ default: () => <div>Recurring Page</div> }));
 

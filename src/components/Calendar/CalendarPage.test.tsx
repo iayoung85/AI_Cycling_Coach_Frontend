@@ -135,6 +135,7 @@ vi.mock('@fullcalendar/daygrid', () => ({ default: {} }));
 vi.mock('@fullcalendar/timegrid', () => ({ default: {} }));
 vi.mock('@fullcalendar/interaction', () => ({ default: {} }));
 vi.mock('../../services/api', () => ({
+  createFavorite: vi.fn(),
   fetchAllPlans: vi.fn(),
   submitAthleteNote: vi.fn(),
   createEvent: vi.fn(),
@@ -143,6 +144,7 @@ vi.mock('../../services/api', () => ({
   rescheduleCoachEntry: vi.fn(),
 }));
 
+const createFavoriteMock = vi.mocked(api.createFavorite);
 const fetchAllPlansMock = vi.mocked(api.fetchAllPlans);
 
 const workoutPlan = [
@@ -212,6 +214,55 @@ describe('CalendarPage', () => {
     expect(await screen.findByText('Workout: Easy Endurance Ride — Back to It')).toBeInTheDocument();
     expect(screen.getByText('warmup: 10min Z1')).toBeInTheDocument();
     expect(screen.getByText('main: 40min Z2, steady rhythmic pedaling, 85-95rpm')).toBeInTheDocument();
+  });
+
+  it('adds a workout entry to favorites from the detail modal', async () => {
+    createFavoriteMock.mockResolvedValue({
+      id: 'ftp-builder',
+      category: 'uncategorized',
+      title: 'Easy Endurance Ride — Back to It',
+      notes: 'First day of your free week.',
+      workout_details: {
+        type: 'ride',
+        duration_minutes: 60,
+        intensity: 'easy',
+        tss_planned: 42,
+        structure: [
+          'warmup: 10min Z1',
+          'main: 40min Z2, steady rhythmic pedaling, 85-95rpm',
+          'cooldown: 10min Z1',
+        ],
+        notes: 'Outdoor preferred.',
+      },
+      created_at: '2026-05-03T10:00:00',
+      updated_at: '2026-05-03T10:00:00',
+    });
+
+    render(<CalendarPage />);
+
+    fireEvent.click(await screen.findByRole('button', {
+      name: 'Easy Endurance Ride — Back to It',
+    }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add to Favorites' }));
+
+    expect(await screen.findByText('Saved to favorites.')).toBeInTheDocument();
+    expect(createFavoriteMock).toHaveBeenCalledWith({
+      title: 'Easy Endurance Ride — Back to It',
+      notes: 'First day of your free week.',
+      workout_details: {
+        type: 'ride',
+        duration_minutes: 60,
+        intensity: 'easy',
+        tss_planned: 42,
+        structure: [
+          'warmup: 10min Z1',
+          'main: 40min Z2, steady rhythmic pedaling, 85-95rpm',
+          'cooldown: 10min Z1',
+        ],
+        notes: 'Outdoor preferred.',
+      },
+    });
   });
 
   it('fetches plans on initial load', async () => {

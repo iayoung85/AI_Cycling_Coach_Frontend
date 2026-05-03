@@ -37,6 +37,11 @@ export default function AppLayout({ children, user, isLocalMode, onLogout }: Pro
             </NavLink>
           </li>
           <li>
+            <NavLink to="/favorites" onClick={() => setIsSidebarOpen(false)}>
+              ⭐ Favorites
+            </NavLink>
+          </li>
+          <li>
             <NavLink to="/recurring" onClick={() => setIsSidebarOpen(false)}>
               🔁 Recurring
             </NavLink>

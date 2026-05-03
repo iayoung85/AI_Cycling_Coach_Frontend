@@ -3,6 +3,27 @@ import type { PlanMeta, PlanEntry, PlanWeek, Category, WorkoutDetails } from '..
 
 const VALID_CATEGORIES: Category[] = ['Workout', 'Life', 'Work', 'Note', 'Checkin'];
 
+function isEventHeading(line: string): boolean {
+  return /^### (All Day|\d{2}:\d{2})\s*[—–-]\s*(\w+):\s*(.+)/.test(line) || /^### REST DAY/i.test(line);
+}
+
+function isEntryBoundarySeparator(lines: string[], index: number): boolean {
+  if (lines[index].trim() !== '---') {
+    return false;
+  }
+
+  let nextIndex = index + 1;
+  while (nextIndex < lines.length && lines[nextIndex].trim() === '') {
+    nextIndex += 1;
+  }
+
+  if (nextIndex >= lines.length) {
+    return true;
+  }
+
+  return lines[nextIndex].startsWith('## ') || isEventHeading(lines[nextIndex]) || lines[nextIndex].startsWith('<!-- ');
+}
+
 function toFiniteNumber(value: unknown): number | undefined {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value;
@@ -203,8 +224,12 @@ export function parsePlanFile(raw: string, filename: string): PlanWeek {
       i++;
 
       // Collect body content until next heading or end
-      while (i < lines.length && !lines[i].match(/^##/)) {
+      while (i < lines.length) {
         const l = lines[i];
+
+        if (l.match(/^##/) || isEventHeading(l) || isEntryBoundarySeparator(lines, i)) {
+          break;
+        }
 
         // Event ID comment (user-created events)
         const eventIdMatch = l.match(/^<!-- event_id:\s*(.+?)\s*-->$/);
@@ -221,7 +246,7 @@ export function parsePlanFile(raw: string, filename: string): PlanWeek {
           continue;
         }
 
-        const metadataCommentMatch = l.match(/^<!--\s*(recurrence_id|all_day):/i);
+        const metadataCommentMatch = l.match(/^<!--\s*(recurrence_id|all_day|favorite_id):/i);
         if (metadataCommentMatch) {
           i++;
           continue;
