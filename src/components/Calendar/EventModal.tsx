@@ -206,7 +206,7 @@ export default function EventModal({
               placeholder="Optional description…"
               value={notes}
               onChange={e => setNotes(e.target.value)}
-              rows={2}
+              rows={4}
               disabled={saving}
             />
           </div>
@@ -268,7 +268,7 @@ export default function EventModal({
                   placeholder="Structure, targets…"
                   value={wNotes}
                   onChange={e => setWNotes(e.target.value)}
-                  rows={2}
+                  rows={6}
                   disabled={saving}
                 />
               </div>

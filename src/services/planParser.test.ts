@@ -2,6 +2,34 @@ import { describe, expect, it } from 'vitest';
 
 import { normalizeWorkoutDetails, parsePlanFile } from './planParser';
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function makePlan(yamlLines: string[]): string {
+  return [
+    '---',
+    'week_start: 2026-05-04',
+    'season: base',
+    'training_block: "Base"',
+    'week_number: 1.1',
+    '---',
+    '',
+    '# Week of 2026-05-04',
+    '',
+    '---',
+    '',
+    '## 2026-05-04 (Monday)',
+    '',
+    '### 09:00 — Workout: Test Workout',
+    '<!-- event_id: test-id-001 -->',
+    '',
+    '```yaml',
+    ...yamlLines,
+    '```',
+  ].join('\n');
+}
+
 const workoutPlan = [
   '---',
   'week_start: 2026-05-04',
@@ -34,6 +62,10 @@ const workoutPlan = [
   'notes: "Outdoor preferred."',
   '```',
 ].join('\n');
+
+// ---------------------------------------------------------------------------
+// Existing tests
+// ---------------------------------------------------------------------------
 
 describe('planParser', () => {
   it('normalizes canonical structured workout yaml steps when parsing a plan file', () => {
@@ -83,3 +115,150 @@ describe('planParser', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// YAML format robustness — block scalar (pyyaml output) and edge-case strings
+// ---------------------------------------------------------------------------
+
+describe('planParser — yaml block formats', () => {
+  it('parses block scalar notes written by the backend (|-)', () => {
+    // pyyaml uses |- style for multi-line strings without a trailing newline
+    const parsed = parsePlanFile(
+      makePlan([
+        'type: Strength and Mobility',
+        'duration_minutes: 40',
+        'intensity: moderate',
+        'notes: |-',
+        "  - 15' outdoor walk",
+        '  - MFR PVC pipe roll out muscles full body',
+        "  - Hip stretches, 90/90's",
+        '  2 rotations:',
+        '  - 2x10 pushups',
+        '  - 2x20 lunges',
+      ]),
+      'week-2026-05-04.md',
+    );
+    const w = parsed.entries[0].workoutYaml!;
+    expect(w.type).toBe('Strength and Mobility');
+    expect(w.intensity).toBe('moderate');
+    expect(w.notes).toContain("15' outdoor walk");
+    expect(w.notes).toContain("90/90's");
+    expect(w.notes).toContain('2x10 pushups');
+  });
+
+  it('parses block scalar notes with | style (trailing newline preserved)', () => {
+    const parsed = parsePlanFile(
+      makePlan([
+        'type: ride',
+        'notes: |',
+        '  First line',
+        '  Second line',
+        '  Third: line with colon',
+      ]),
+      'week-2026-05-04.md',
+    );
+    const w = parsed.entries[0].workoutYaml!;
+    expect(w.notes).toContain('First line');
+    expect(w.notes).toContain('Third: line with colon');
+  });
+
+  it('parses notes containing colons without treating them as yaml keys', () => {
+    const parsed = parsePlanFile(
+      makePlan([
+        'type: ride',
+        'notes: |-',
+        '  Target HR: 145bpm',
+        '  Gear ratio: 34:28',
+      ]),
+      'week-2026-05-04.md',
+    );
+    expect(parsed.entries[0].workoutYaml?.notes).toContain('Target HR: 145bpm');
+    expect(parsed.entries[0].workoutYaml?.notes).toContain('Gear ratio: 34:28');
+  });
+
+  it("parses notes containing apostrophes and single quotes", () => {
+    const parsed = parsePlanFile(
+      makePlan([
+        'type: strength',
+        "notes: \"Coach's tip: don't skip the warm-up\"",
+      ]),
+      'week-2026-05-04.md',
+    );
+    expect(parsed.entries[0].workoutYaml?.notes).toContain("Coach's tip");
+  });
+
+  it('parses notes containing double quotes inside single-quoted yaml scalar', () => {
+    // Some yaml serializers may choose single-quoted style for strings with "
+    const parsed = parsePlanFile(
+      makePlan([
+        "type: ride",
+        "notes: 'Coach said \"go easy\" today'",
+      ]),
+      'week-2026-05-04.md',
+    );
+    expect(parsed.entries[0].workoutYaml?.notes).toContain('Coach said "go easy" today');
+  });
+
+  it('parses notes with unicode and emoji', () => {
+    const parsed = parsePlanFile(
+      makePlan([
+        'type: ride',
+        'notes: "Great ride! \uD83D\uDEB4 Felt strong \uD83D\uDCAA"',
+      ]),
+      'week-2026-05-04.md',
+    );
+    expect(parsed.entries[0].workoutYaml?.notes).toContain('Great ride!');
+    expect(parsed.entries[0].workoutYaml?.notes).toContain('🚴');
+  });
+
+  it('parses type field containing spaces (Strength and Mobility)', () => {
+    const parsed = parsePlanFile(
+      makePlan(['type: Strength and Mobility', 'duration_minutes: 40']),
+      'week-2026-05-04.md',
+    );
+    expect(parsed.entries[0].workoutYaml?.type).toBe('Strength and Mobility');
+  });
+
+  it('parses intensity field containing spaces (very hard)', () => {
+    const parsed = parsePlanFile(
+      makePlan(['type: ride', 'intensity: very hard']),
+      'week-2026-05-04.md',
+    );
+    expect(parsed.entries[0].workoutYaml?.intensity).toBe('very hard');
+  });
+
+  it('returns undefined workoutYaml when yaml block is invalid and does not throw', () => {
+    // If user somehow enters truly broken yaml, the parser should degrade gracefully
+    const plan = makePlan([
+      'type: ride',
+      'notes: "unclosed double quote string',  // intentionally broken
+    ]);
+    // Should not throw
+    const parsed = parsePlanFile(plan, 'week-2026-05-04.md');
+    // workoutYaml will be undefined due to parse failure — entry still exists
+    expect(parsed.entries).toHaveLength(1);
+    expect(parsed.entries[0].workoutYaml).toBeUndefined();
+  });
+
+  it('returns undefined workoutYaml when there is no yaml block', () => {
+    const plan = makePlan([]);  // no yaml content between fences → empty block
+    const parsed = parsePlanFile(plan, 'week-2026-05-04.md');
+    // Empty yaml → normalizeWorkoutDetails returns undefined
+    expect(parsed.entries[0].workoutYaml).toBeUndefined();
+  });
+
+  it('handles missing optional fields gracefully', () => {
+    const parsed = parsePlanFile(
+      makePlan(['type: ride']),
+      'week-2026-05-04.md',
+    );
+    const w = parsed.entries[0].workoutYaml!;
+    expect(w.type).toBe('ride');
+    expect(w.duration_minutes).toBeUndefined();
+    expect(w.intensity).toBeUndefined();
+    expect(w.tss_planned).toBeUndefined();
+    expect(w.structure).toBeUndefined();
+    expect(w.notes).toBeUndefined();
+  });
+});
+
