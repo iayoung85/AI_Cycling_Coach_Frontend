@@ -34,6 +34,49 @@ const CATEGORY_COLORS: Record<string, string> = {
   Checkin: '#06b6d4',
 };
 
+const DEFAULT_SLOT_MIN_TIME = '05:00:00';
+const DEFAULT_SLOT_MAX_TIME = '23:00:00';
+const DEFAULT_SCROLL_TIME = '06:00:00';
+const EARLY_EVENT_THRESHOLD_MINUTES = 5 * 60;
+const LATE_EVENT_THRESHOLD_MINUTES = 22 * 60;
+
+type TimeGridSlotRange = {
+  slotMinTime: string;
+  slotMaxTime: string;
+  scrollTime: string;
+};
+
+function parseEntryTimeMinutes(time: string): number | null {
+  const match = time.match(/^(\d{2}):(\d{2})$/);
+  if (!match) {
+    return null;
+  }
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours > 23 || minutes > 59) {
+    return null;
+  }
+
+  return hours * 60 + minutes;
+}
+
+function buildTimeGridSlotRange(entries: PlanEntry[]): TimeGridSlotRange {
+  const entryTimes = entries
+    .filter(entry => entry.time !== 'REST' && !entry.allDay)
+    .map(entry => parseEntryTimeMinutes(entry.time))
+    .filter((minutes): minutes is number => minutes !== null);
+
+  const hasEarlyEvent = entryTimes.some(minutes => minutes < EARLY_EVENT_THRESHOLD_MINUTES);
+  const hasLateEvent = entryTimes.some(minutes => minutes >= LATE_EVENT_THRESHOLD_MINUTES);
+
+  return {
+    slotMinTime: hasEarlyEvent ? '00:00:00' : DEFAULT_SLOT_MIN_TIME,
+    slotMaxTime: hasLateEvent ? '24:00:00' : DEFAULT_SLOT_MAX_TIME,
+    scrollTime: hasEarlyEvent ? '00:00:00' : DEFAULT_SCROLL_TIME,
+  };
+}
+
 function buildWeekSummaryMeta(week: PlanWeek): string {
   return [
     week.meta.training_block,
@@ -378,6 +421,7 @@ export default function CalendarPage() {
   const visibleWeek = (visibleWeekStart ? weeksByStart.get(visibleWeekStart) : undefined) ?? weeks[0] ?? null;
   const visibleWeekMeta = visibleWeek ? buildWeekSummaryMeta(visibleWeek) : '';
   const showDaySummaryButton = currentViewType === 'timeGridDay' && visibleWeek;
+  const timeGridSlotRange = buildTimeGridSlotRange(visibleWeek?.entries ?? []);
 
   if (loading) return <div className="calendar-page"><p>Loading plans…</p></div>;
 
@@ -461,10 +505,10 @@ export default function CalendarPage() {
           height="auto"
           eventDisplay="block"
           dayMaxEventRows={isMobile ? 2 : true}
-          slotMinTime="05:00:00"
-          slotMaxTime="23:00:00"
+          slotMinTime={timeGridSlotRange.slotMinTime}
+          slotMaxTime={timeGridSlotRange.slotMaxTime}
           nowIndicator={true}
-          scrollTime="06:00:00"
+          scrollTime={timeGridSlotRange.scrollTime}
           datesSet={(info) => {
             setCurrentViewType(info.view.type);
 

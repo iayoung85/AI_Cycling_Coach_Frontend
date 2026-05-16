@@ -19,6 +19,9 @@ type MockCalendarEvent = {
 type MockCalendarProps = {
   initialView?: string;
   events?: MockCalendarEvent[];
+  slotMinTime?: string;
+  slotMaxTime?: string;
+  scrollTime?: string;
   dateClick?: (arg: {
     date: Date;
     allDay: boolean;
@@ -84,7 +87,17 @@ function attachSummaryDateClick(
 }
 
 vi.mock('@fullcalendar/react', () => ({
-  default: ({ initialView, events = [], dateClick, datesSet, dayCellContent, eventClick }: MockCalendarProps) => {
+  default: ({
+    initialView,
+    events = [],
+    slotMinTime,
+    slotMaxTime,
+    scrollTime,
+    dateClick,
+    datesSet,
+    dayCellContent,
+    eventClick,
+  }: MockCalendarProps) => {
     const anchorDate = events[0]?.start ? new Date(events[0].start) : new Date('2026-05-04T09:00:00');
     const monthCell = initialView === 'dayGridMonth' && dayCellContent
       ? attachSummaryDateClick(
@@ -99,7 +112,12 @@ vi.mock('@fullcalendar/react', () => ({
       : null;
 
     return (
-      <div data-testid="mock-calendar">
+      <div
+        data-testid="mock-calendar"
+        data-slot-min-time={slotMinTime}
+        data-slot-max-time={slotMaxTime}
+        data-scroll-time={scrollTime}
+      >
         {monthCell && <div data-testid="mock-month-cell">{monthCell}</div>}
         {datesSet && (
           <button
@@ -177,6 +195,39 @@ const workoutPlan = [
   '  - main: "40min Z2, steady rhythmic pedaling, 85-95rpm"',
   '  - cooldown: "10min Z1"',
   'notes: "Outdoor preferred."',
+  '```',
+].join('\n');
+
+const overnightPlan = [
+  '---',
+  'week_start: 2026-05-18',
+  'season: base',
+  'training_block: "Base Phase 2"',
+  'week_number: 1.5',
+  '---',
+  '',
+  '# Week of 2026-05-18',
+  '',
+  '## 2026-05-18 (Monday)',
+  '',
+  '### 01:00 — Workout: Overnight Spin',
+  '',
+  'This should be visible in the weekly time grid.',
+  '',
+  '```yaml',
+  'type: ride',
+  'duration_minutes: 45',
+  '```',
+  '',
+  '## 2026-05-24 (Sunday)',
+  '',
+  '### 22:00 — Workout: Night Shift Easy Spin',
+  '',
+  'Late placeholder for an overnight ride.',
+  '',
+  '```yaml',
+  'type: ride',
+  'duration_minutes: 45',
   '```',
 ].join('\n');
 
@@ -271,6 +322,26 @@ describe('CalendarPage', () => {
     await screen.findByRole('button', { name: 'Easy Endurance Ride — Back to It' });
 
     expect(fetchAllPlansMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('expands the weekly time grid for overnight and late planned rides', async () => {
+    fetchAllPlansMock.mockResolvedValue({
+      plans: [
+        {
+          filename: 'week-2026-05-18.md',
+          content: overnightPlan,
+        },
+      ],
+    });
+
+    render(<CalendarPage />);
+
+    const calendar = await screen.findByTestId('mock-calendar');
+    expect(calendar).toHaveAttribute('data-slot-min-time', '00:00:00');
+    expect(calendar).toHaveAttribute('data-slot-max-time', '24:00:00');
+    expect(calendar).toHaveAttribute('data-scroll-time', '00:00:00');
+    expect(screen.getByRole('button', { name: 'Overnight Spin' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Night Shift Easy Spin' })).toBeInTheDocument();
   });
 
   it('opens a week summary modal from the monday badge in month view without opening add event first', async () => {

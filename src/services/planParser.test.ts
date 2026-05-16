@@ -114,6 +114,53 @@ describe('planParser', () => {
       notes: 'Outdoor preferred.',
     });
   });
+
+  it('parses early-morning workouts and later entries around malformed coach subheadings', () => {
+    const parsed = parsePlanFile(
+      [
+        '---',
+        'week_start: 2026-05-18',
+        'season: base',
+        'training_block: "Base Phase 2"',
+        'week_number: 1.5',
+        '---',
+        '',
+        '# Week of 2026-05-18',
+        '',
+        '## 2026-05-24 (Sunday)',
+        '',
+        '### 01:00 — Workout: Night Shift Easy Spin',
+        '',
+        'Overnight trainer ride.',
+        '',
+        '```yaml',
+        'type: ride',
+        'duration_minutes: 45',
+        '```',
+        '',
+        '### Sleep after shift (05:30 onwards)',
+        '',
+        'Malformed coach note that should not become an event or block later entries.',
+        '',
+        '### 17:30 — Work: Night Shift',
+        '<!-- event_id: recur-work-night-shift-2026-05-24 -->',
+        '<!-- recurrence_id: work-night-shift -->',
+        '',
+        'Rotation week 1.',
+      ].join('\n'),
+      'week-2026-05-18.md',
+    );
+
+    expect(parsed.entries).toHaveLength(2);
+    expect(parsed.entries.map(entry => [entry.time, entry.category, entry.title])).toEqual([
+      ['01:00', 'Workout', 'Night Shift Easy Spin'],
+      ['17:30', 'Work', 'Night Shift'],
+    ]);
+    expect(parsed.entries[0].workoutYaml).toEqual({
+      type: 'ride',
+      duration_minutes: 45,
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
