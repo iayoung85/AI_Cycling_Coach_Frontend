@@ -9,6 +9,8 @@ import type {
   RecurrenceRule,
   RecurrenceRulePayload,
   RecurrenceUpdatePayload,
+  AthleteNoteMetadata,
+  AthleteNoteTarget,
 } from '../types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000';
@@ -232,7 +234,8 @@ export async function fetchAllPlans(_options?: { forceRefresh?: boolean }): Prom
 export async function submitAthleteNote(
   date: string,
   note?: string,
-  metadata?: { actual_duration?: number; freshness?: number; difficulty?: number; rpe?: number; stats?: string }
+  metadata?: AthleteNoteMetadata,
+  targetEntry?: AthleteNoteTarget,
 ): Promise<{ success: boolean; message: string; note_content?: string }> {
   const body: Record<string, unknown> = {};
   
@@ -243,6 +246,15 @@ export async function submitAthleteNote(
   
   if (metadata) {
     Object.assign(body, metadata);
+  }
+
+  if (targetEntry) {
+    body.entry_time = targetEntry.allDay ? 'All Day' : targetEntry.time;
+    body.entry_category = targetEntry.category;
+    body.entry_title = targetEntry.title;
+    if (targetEntry.eventId) {
+      body.event_id = targetEntry.eventId;
+    }
   }
 
   const res = await apiFetch(`/api/plans/${date}/notes`, {

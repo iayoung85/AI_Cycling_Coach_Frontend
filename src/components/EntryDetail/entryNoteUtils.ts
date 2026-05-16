@@ -1,12 +1,4 @@
-import type { PlanEntry, PlanWeek } from '../../types';
-
-export interface AthleteNoteMetadata {
-  actual_duration?: number;
-  freshness?: number;
-  difficulty?: number;
-  rpe?: number;
-  stats?: string;
-}
+import type { AthleteNoteMetadata, PlanEntry, PlanWeek } from '../../types';
 
 export interface EntryDetailModalNotePayload {
   note: string;

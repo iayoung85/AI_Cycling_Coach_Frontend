@@ -97,6 +97,22 @@ export interface FavoriteSchedulePayload {
 
 export type Category = 'Workout' | 'Life' | 'Work' | 'Note' | 'Checkin';
 
+export interface AthleteNoteMetadata {
+  actual_duration?: number;
+  freshness?: number;
+  difficulty?: number;
+  rpe?: number;
+  stats?: string;
+}
+
+export interface AthleteNoteTarget {
+  time: string;
+  category: Category;
+  title: string;
+  eventId?: string;
+  allDay?: boolean;
+}
+
 // Structured workout fields from yaml code block
 export interface WorkoutDetails {
   type?: string;

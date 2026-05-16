@@ -24,6 +24,30 @@ function isEntryBoundarySeparator(lines: string[], index: number): boolean {
   return lines[nextIndex].startsWith('## ') || isEventHeading(lines[nextIndex]) || lines[nextIndex].startsWith('<!-- ');
 }
 
+function hasLegacyCalloutClosingLine(lines: string[], index: number): boolean {
+  let nextIndex = index + 1;
+
+  while (nextIndex < lines.length) {
+    const nextLine = lines[nextIndex];
+
+    if (nextLine.match(/^##/) || isEventHeading(nextLine) || isEntryBoundarySeparator(lines, nextIndex)) {
+      return false;
+    }
+
+    if (nextLine.trim() === '>') {
+      return true;
+    }
+
+    if (nextLine.startsWith('>')) {
+      return false;
+    }
+
+    nextIndex += 1;
+  }
+
+  return false;
+}
+
 function toFiniteNumber(value: unknown): number | undefined {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value;
@@ -273,8 +297,30 @@ export function parsePlanFile(raw: string, filename: string): PlanWeek {
         if (l.match(/^>\s*\[!NOTE\]/i)) {
           i++;
           let noteContent = '';
-          while (i < lines.length && lines[i].startsWith('>')) {
-            noteContent += lines[i].replace(/^>\s?/, '') + '\n';
+          while (i < lines.length) {
+            const noteLine = lines[i];
+
+            if (noteLine.startsWith('>')) {
+              noteContent += noteLine.replace(/^>\s?/, '') + '\n';
+              i++;
+              continue;
+            }
+
+            if (noteLine.trim() === '') {
+              i++;
+              continue;
+            }
+
+            if (
+              noteLine.match(/^##/)
+              || isEventHeading(noteLine)
+              || isEntryBoundarySeparator(lines, i)
+              || !hasLegacyCalloutClosingLine(lines, i)
+            ) {
+              break;
+            }
+
+            noteContent += noteLine + '\n';
             i++;
           }
           athleteNotes.push(noteContent.trim());

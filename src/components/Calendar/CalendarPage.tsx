@@ -395,7 +395,7 @@ export default function CalendarPage() {
     }
 
     try {
-      const result = await submitAthleteNote(noteEntry.date, noteToSend, metadata);
+      const result = await submitAthleteNote(noteEntry.date, noteToSend, metadata, noteEntry);
 
       if (result.note_content !== undefined) {
         const { weeks: updatedWeeks, updatedEntry } = applyAthleteNoteToWeeks(weeks, noteEntry, result.note_content);

@@ -161,6 +161,40 @@ describe('planParser', () => {
       duration_minutes: 45,
     });
   });
+
+  it('parses legacy multiline athlete notes with unquoted continuation lines', () => {
+    const parsed = parsePlanFile(
+      [
+        '---',
+        'week_start: 2026-05-04',
+        'season: base',
+        'training_block: "Base"',
+        'week_number: 1.1',
+        '---',
+        '',
+        '# Week of 2026-05-04',
+        '',
+        '## 2026-05-10 (Sunday)',
+        '',
+        '### 14:00 — Checkin: Illness Recovery + Readiness for Next Week',
+        '',
+        'Recovery prompt.',
+        '',
+        '> [!NOTE]',
+        '> **Athlete note** (2026-05-16 06:51)',
+        '> Symptoms improving.',
+        'Energy is 7/10.',
+        'Back feels good.',
+        '>',
+      ].join('\n'),
+      'week-2026-05-04.md',
+    );
+
+    expect(parsed.entries[0].athleteNotes[0]).toContain('Symptoms improving.');
+    expect(parsed.entries[0].athleteNotes[0]).toContain('Energy is 7/10.');
+    expect(parsed.entries[0].athleteNotes[0]).toContain('Back feels good.');
+    expect(parsed.entries[0].description).toBe('Recovery prompt.');
+  });
 });
 
 // ---------------------------------------------------------------------------

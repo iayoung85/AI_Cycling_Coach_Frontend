@@ -142,7 +142,7 @@ export default function ListViewPage() {
     }
 
     try {
-      const result = await submitAthleteNote(selectedEntry.date, noteToSend, metadata);
+      const result = await submitAthleteNote(selectedEntry.date, noteToSend, metadata, selectedEntry);
 
       if (result.note_content !== undefined) {
         const { weeks: updatedWeeks, updatedEntry } = applyAthleteNoteToWeeks(weeks, selectedEntry, result.note_content);

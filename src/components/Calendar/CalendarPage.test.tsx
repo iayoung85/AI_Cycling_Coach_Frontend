@@ -164,6 +164,7 @@ vi.mock('../../services/api', () => ({
 
 const createFavoriteMock = vi.mocked(api.createFavorite);
 const fetchAllPlansMock = vi.mocked(api.fetchAllPlans);
+const submitAthleteNoteMock = vi.mocked(api.submitAthleteNote);
 
 const workoutPlan = [
   '---',
@@ -229,6 +230,29 @@ const overnightPlan = [
   'type: ride',
   'duration_minutes: 45',
   '```',
+].join('\n');
+
+const checkinPlan = [
+  '---',
+  'week_start: 2026-05-11',
+  'season: base',
+  'training_block: "Base Phase 2"',
+  'week_number: 1.4',
+  '---',
+  '',
+  '# Week of 2026-05-11',
+  '',
+  '## 2026-05-17 (Sunday)',
+  '',
+  '### 14:00 — Checkin: Illness Recovery + Readiness for Next Week',
+  '',
+  'Recovery prompt.',
+  '',
+  '### All Day — Life: Graduation Party',
+  '<!-- event_id: life-grad-party-2026-05-17 -->',
+  '<!-- all_day: true -->',
+  '',
+  'Busy day.',
 ].join('\n');
 
 describe('CalendarPage', () => {
@@ -342,6 +366,45 @@ describe('CalendarPage', () => {
     expect(calendar).toHaveAttribute('data-scroll-time', '00:00:00');
     expect(screen.getByRole('button', { name: 'Overnight Spin' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Night Shift Easy Spin' })).toBeInTheDocument();
+  });
+
+  it('submits athlete notes with the selected checkin entry identity', async () => {
+    fetchAllPlansMock.mockResolvedValue({
+      plans: [
+        {
+          filename: 'week-2026-05-11.md',
+          content: checkinPlan,
+        },
+      ],
+    });
+    submitAthleteNoteMock.mockResolvedValue({
+      success: true,
+      message: 'Note submitted',
+      note_content: 'Athlete note\nSymptoms improving.',
+    });
+
+    render(<CalendarPage />);
+
+    fireEvent.click(await screen.findByRole('button', {
+      name: 'Illness Recovery + Readiness for Next Week',
+    }));
+    fireEvent.change(screen.getByLabelText(/Your Notes/i), {
+      target: { value: 'Symptoms improving.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
+
+    expect(await screen.findByText('Note submitted!')).toBeInTheDocument();
+    expect(submitAthleteNoteMock).toHaveBeenCalledWith(
+      '2026-05-17',
+      'Symptoms improving.',
+      undefined,
+      expect.objectContaining({
+        date: '2026-05-17',
+        time: '14:00',
+        category: 'Checkin',
+        title: 'Illness Recovery + Readiness for Next Week',
+      }),
+    );
   });
 
   it('opens a week summary modal from the monday badge in month view without opening add event first', async () => {
