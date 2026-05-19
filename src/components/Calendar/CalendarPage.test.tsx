@@ -22,6 +22,8 @@ type MockCalendarProps = {
   slotMinTime?: string;
   slotMaxTime?: string;
   scrollTime?: string;
+  eventDragMinDistance?: number;
+  eventLongPressDelay?: number;
   dateClick?: (arg: {
     date: Date;
     allDay: boolean;
@@ -93,6 +95,8 @@ vi.mock('@fullcalendar/react', () => ({
     slotMinTime,
     slotMaxTime,
     scrollTime,
+    eventDragMinDistance,
+    eventLongPressDelay,
     dateClick,
     datesSet,
     dayCellContent,
@@ -117,6 +121,8 @@ vi.mock('@fullcalendar/react', () => ({
         data-slot-min-time={slotMinTime}
         data-slot-max-time={slotMaxTime}
         data-scroll-time={scrollTime}
+        data-event-drag-min-distance={eventDragMinDistance}
+        data-event-long-press-delay={eventLongPressDelay}
       >
         {monthCell && <div data-testid="mock-month-cell">{monthCell}</div>}
         {datesSet && (
@@ -443,6 +449,26 @@ describe('CalendarPage', () => {
 
       expect(await screen.findByRole('dialog', { name: 'Week of 2026-05-04' })).toBeInTheDocument();
       expect(screen.queryByText('Add Event')).not.toBeInTheDocument();
+    } finally {
+      window.innerWidth = originalWidth;
+    }
+  });
+
+  it('enables immediate event dragging in mobile day view', async () => {
+    const originalWidth = window.innerWidth;
+    window.innerWidth = 500;
+
+    try {
+      render(<CalendarPage />);
+
+      const calendar = await screen.findByTestId('mock-calendar');
+      expect(calendar).not.toHaveAttribute('data-event-long-press-delay');
+      expect(calendar).not.toHaveAttribute('data-event-drag-min-distance');
+
+      fireEvent.click(screen.getByRole('button', { name: 'Switch to day view' }));
+
+      expect(await screen.findByTestId('mock-calendar')).toHaveAttribute('data-event-long-press-delay', '0');
+      expect(screen.getByTestId('mock-calendar')).toHaveAttribute('data-event-drag-min-distance', '3');
     } finally {
       window.innerWidth = originalWidth;
     }
