@@ -105,6 +105,21 @@ export interface AthleteNoteMetadata {
   stats?: string;
 }
 
+export type AthleteNoteAction = 'append' | 'update' | 'upsert';
+
+export interface AthleteNoteOptions {
+  action?: AthleteNoteAction;
+  noteIndex?: number;
+}
+
+export interface AthleteNoteResponse {
+  success: boolean;
+  message: string;
+  note_content?: string;
+  note_index?: number;
+  note_action?: AthleteNoteAction;
+}
+
 export interface AthleteNoteTarget {
   time: string;
   category: Category;

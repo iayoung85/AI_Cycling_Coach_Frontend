@@ -39,8 +39,6 @@ const DEFAULT_SLOT_MAX_TIME = '23:00:00';
 const DEFAULT_SCROLL_TIME = '06:00:00';
 const EARLY_EVENT_THRESHOLD_MINUTES = 5 * 60;
 const LATE_EVENT_THRESHOLD_MINUTES = 22 * 60;
-const MOBILE_EVENT_DRAG_MIN_DISTANCE = 3;
-const MOBILE_EVENT_LONG_PRESS_DELAY = 0;
 
 type TimeGridSlotRange = {
   slotMinTime: string;
@@ -390,17 +388,25 @@ export default function CalendarPage() {
 
   const handleSubmitNote = async (payload: EntryDetailModalNotePayload) => {
     if (!noteEntry) return;
-    const { noteToSend, metadata } = buildAthleteNoteRequest(noteEntry, payload);
+    const { noteToSend, metadata, noteOptions } = buildAthleteNoteRequest(noteEntry, payload);
 
     if (!noteToSend && !metadata) {
       return;
     }
 
     try {
-      const result = await submitAthleteNote(noteEntry.date, noteToSend, metadata, noteEntry);
+      const result = await submitAthleteNote(noteEntry.date, noteToSend, metadata, noteEntry, noteOptions);
 
       if (result.note_content !== undefined) {
-        const { weeks: updatedWeeks, updatedEntry } = applyAthleteNoteToWeeks(weeks, noteEntry, result.note_content);
+        const { weeks: updatedWeeks, updatedEntry } = applyAthleteNoteToWeeks(
+          weeks,
+          noteEntry,
+          result.note_content,
+          {
+            action: result.note_action ?? noteOptions.action,
+            noteIndex: result.note_index ?? noteOptions.noteIndex,
+          },
+        );
         setWeeks(updatedWeeks);
         if (updatedEntry) {
           setNoteEntry(updatedEntry);
@@ -424,7 +430,6 @@ export default function CalendarPage() {
   const visibleWeekMeta = visibleWeek ? buildWeekSummaryMeta(visibleWeek) : '';
   const showDaySummaryButton = currentViewType === 'timeGridDay' && visibleWeek;
   const timeGridSlotRange = buildTimeGridSlotRange(visibleWeek?.entries ?? []);
-  const enableMobileDayEventDrag = isMobile && currentViewType === 'timeGridDay';
 
   if (loading) return <div className="calendar-page"><p>Loading plans…</p></div>;
 
@@ -507,8 +512,6 @@ export default function CalendarPage() {
           events={fcEvents}
           height="auto"
           eventDisplay="block"
-          eventDragMinDistance={enableMobileDayEventDrag ? MOBILE_EVENT_DRAG_MIN_DISTANCE : undefined}
-          eventLongPressDelay={enableMobileDayEventDrag ? MOBILE_EVENT_LONG_PRESS_DELAY : undefined}
           dayMaxEventRows={isMobile ? 2 : true}
           slotMinTime={timeGridSlotRange.slotMinTime}
           slotMaxTime={timeGridSlotRange.slotMaxTime}

@@ -135,17 +135,25 @@ export default function ListViewPage() {
       return;
     }
 
-    const { noteToSend, metadata } = buildAthleteNoteRequest(selectedEntry, payload);
+    const { noteToSend, metadata, noteOptions } = buildAthleteNoteRequest(selectedEntry, payload);
 
     if (!noteToSend && !metadata) {
       return;
     }
 
     try {
-      const result = await submitAthleteNote(selectedEntry.date, noteToSend, metadata, selectedEntry);
+      const result = await submitAthleteNote(selectedEntry.date, noteToSend, metadata, selectedEntry, noteOptions);
 
       if (result.note_content !== undefined) {
-        const { weeks: updatedWeeks, updatedEntry } = applyAthleteNoteToWeeks(weeks, selectedEntry, result.note_content);
+        const { weeks: updatedWeeks, updatedEntry } = applyAthleteNoteToWeeks(
+          weeks,
+          selectedEntry,
+          result.note_content,
+          {
+            action: result.note_action ?? noteOptions.action,
+            noteIndex: result.note_index ?? noteOptions.noteIndex,
+          },
+        );
         setWeeks(updatedWeeks);
         if (updatedEntry) {
           setSelectedEntry(updatedEntry);

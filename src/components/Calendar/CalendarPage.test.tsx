@@ -261,6 +261,29 @@ const checkinPlan = [
   'Busy day.',
 ].join('\n');
 
+const workoutWithNotesPlan = [
+  '---',
+  'week_start: 2026-05-04',
+  'season: base',
+  'training_block: "Base Phase 2"',
+  'week_number: 1.3',
+  '---',
+  '',
+  '# Week of 2026-05-04',
+  '',
+  '## 2026-05-04 (Monday)',
+  '',
+  '### 09:00 — Workout: Easy Endurance Ride',
+  '',
+  'Steady aerobic ride.',
+  '',
+  '> [!NOTE]',
+  '> **Athlete note** (2026-05-04 10:00)',
+  '> - RPE: 4/10',
+  '> First note.',
+  '>',
+].join('\n');
+
 describe('CalendarPage', () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -410,7 +433,98 @@ describe('CalendarPage', () => {
         category: 'Checkin',
         title: 'Illness Recovery + Readiness for Next Week',
       }),
+      { action: 'append' },
     );
+  });
+
+  it('adds another athlete note to a coach workout without replacing the existing note', async () => {
+    fetchAllPlansMock.mockResolvedValue({
+      plans: [
+        {
+          filename: 'week-2026-05-04.md',
+          content: workoutWithNotesPlan,
+        },
+      ],
+    });
+    submitAthleteNoteMock.mockResolvedValue({
+      success: true,
+      message: 'Note submitted',
+      note_content: '**Athlete note** (2026-05-04 11:00)\nSecond note.',
+      note_index: 1,
+      note_action: 'append',
+    });
+
+    render(<CalendarPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Easy Endurance Ride' }));
+    expect(await screen.findByText(/First note\./)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/Your Notes/i), {
+      target: { value: 'Second note.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
+
+    expect(await screen.findByText('Note submitted!')).toBeInTheDocument();
+    expect(submitAthleteNoteMock).toHaveBeenCalledWith(
+      '2026-05-04',
+      'Second note.',
+      undefined,
+      expect.objectContaining({
+        date: '2026-05-04',
+        time: '09:00',
+        category: 'Workout',
+        title: 'Easy Endurance Ride',
+      }),
+      { action: 'append' },
+    );
+    expect(screen.getByText(/First note\./)).toBeInTheDocument();
+    expect(screen.getByText(/Second note\./)).toBeInTheDocument();
+  });
+
+  it('updates a selected existing athlete note on a coach workout', async () => {
+    fetchAllPlansMock.mockResolvedValue({
+      plans: [
+        {
+          filename: 'week-2026-05-04.md',
+          content: workoutWithNotesPlan,
+        },
+      ],
+    });
+    submitAthleteNoteMock.mockResolvedValue({
+      success: true,
+      message: 'Note submitted',
+      note_content: '**Athlete note** (2026-05-04 11:00)\n- RPE: 4/10\nUpdated note.',
+      note_index: 0,
+      note_action: 'update',
+    });
+
+    render(<CalendarPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Easy Endurance Ride' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit note 1' }));
+
+    expect(screen.getByLabelText(/Your Notes/i)).toHaveValue('First note.');
+
+    fireEvent.change(screen.getByLabelText(/Your Notes/i), {
+      target: { value: 'Updated note.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
+
+    expect(await screen.findByText('Note submitted!')).toBeInTheDocument();
+    expect(submitAthleteNoteMock).toHaveBeenCalledWith(
+      '2026-05-04',
+      'Updated note.',
+      { rpe: 4 },
+      expect.objectContaining({
+        date: '2026-05-04',
+        time: '09:00',
+        category: 'Workout',
+        title: 'Easy Endurance Ride',
+      }),
+      { action: 'update', noteIndex: 0 },
+    );
+    expect(screen.queryByText(/First note\./)).not.toBeInTheDocument();
+    expect(screen.getByText(/Updated note\./)).toBeInTheDocument();
   });
 
   it('opens a week summary modal from the monday badge in month view without opening add event first', async () => {

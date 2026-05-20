@@ -10,6 +10,8 @@ import type {
   RecurrenceRulePayload,
   RecurrenceUpdatePayload,
   AthleteNoteMetadata,
+  AthleteNoteOptions,
+  AthleteNoteResponse,
   AthleteNoteTarget,
 } from '../types';
 
@@ -236,7 +238,8 @@ export async function submitAthleteNote(
   note?: string,
   metadata?: AthleteNoteMetadata,
   targetEntry?: AthleteNoteTarget,
-): Promise<{ success: boolean; message: string; note_content?: string }> {
+  options?: AthleteNoteOptions,
+): Promise<AthleteNoteResponse> {
   const body: Record<string, unknown> = {};
   
   // Only include athlete_notes if provided
@@ -246,6 +249,14 @@ export async function submitAthleteNote(
   
   if (metadata) {
     Object.assign(body, metadata);
+  }
+
+  if (options?.action) {
+    body.note_action = options.action;
+  }
+
+  if (options?.noteIndex !== undefined) {
+    body.note_index = options.noteIndex;
   }
 
   if (targetEntry) {
@@ -268,7 +279,13 @@ export async function submitAthleteNote(
   }
 
   const data = await res.json();
-  return { success: true, message: data.message || 'Note submitted', note_content: data.note_content };
+  return {
+    success: true,
+    message: data.message || 'Note submitted',
+    note_content: data.note_content,
+    note_index: data.note_index,
+    note_action: data.note_action,
+  };
 }
 
 /** Generate a skeleton week file for the week containing the given date */

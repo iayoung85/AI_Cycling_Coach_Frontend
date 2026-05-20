@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import type { PlanEntry } from '../../types';
-import type { EntryDetailModalNotePayload } from './entryNoteUtils';
+import type { AthleteNoteAction, PlanEntry } from '../../types';
+import { parseAthleteNoteForEditing, type EntryDetailModalNotePayload } from './entryNoteUtils';
 import './EntryDetailModal.css';
 
 interface EntryDetailModalProps {
@@ -18,6 +18,14 @@ function formatEntryMeta(entry: PlanEntry): string {
   return `${entry.date} at ${entry.time}`;
 }
 
+function getNoteOptionLabel(note: string, index: number): string {
+  const parsedNote = parseAthleteNoteForEditing(note);
+  const preview = (parsedNote.note || note).replace(/\s+/g, ' ').trim();
+  const truncatedPreview = preview.length > 48 ? `${preview.slice(0, 48)}...` : preview;
+
+  return truncatedPreview ? `Note ${index + 1}: ${truncatedPreview}` : `Note ${index + 1}`;
+}
+
 export default function EntryDetailModal({
   entry,
   onClose,
@@ -30,9 +38,39 @@ export default function EntryDetailModal({
   const [difficulty, setDifficulty] = useState('');
   const [rpe, setRpe] = useState('');
   const [stats, setStats] = useState('');
+  const [noteAction, setNoteAction] = useState<AthleteNoteAction>('append');
+  const [selectedNoteIndex, setSelectedNoteIndex] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [savingFavorite, setSavingFavorite] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  function clearNoteForm() {
+    setNoteInput('');
+    setActualDuration('');
+    setFreshness('');
+    setDifficulty('');
+    setRpe('');
+    setStats('');
+  }
+
+  function startNewNote() {
+    clearNoteForm();
+    setNoteAction('append');
+    setSelectedNoteIndex(0);
+  }
+
+  function loadNoteForEditing(index: number) {
+    const parsedNote = parseAthleteNoteForEditing(entry.athleteNotes[index] ?? '');
+
+    setNoteAction('update');
+    setSelectedNoteIndex(index);
+    setNoteInput(parsedNote.note);
+    setActualDuration(parsedNote.actualDuration);
+    setFreshness(parsedNote.freshness);
+    setDifficulty(parsedNote.difficulty);
+    setRpe(parsedNote.rpe);
+    setStats(parsedNote.stats);
+  }
 
   useEffect(() => {
     setNoteInput('');
@@ -41,10 +79,15 @@ export default function EntryDetailModal({
     setDifficulty('');
     setRpe('');
     setStats('');
+    setNoteAction('append');
+    setSelectedNoteIndex(0);
     setSubmitMessage(null);
   }, [entry.category, entry.date, entry.time, entry.title]);
 
-  const canSubmit = Boolean(noteInput.trim() || actualDuration || freshness || difficulty || rpe || stats);
+  const hasExistingNotes = entry.athleteNotes.length > 0;
+  const hasSelectedExistingNote = noteAction !== 'update' || selectedNoteIndex < entry.athleteNotes.length;
+  const canSubmit = Boolean(noteInput.trim() || actualDuration || freshness || difficulty || rpe || stats)
+    && hasSelectedExistingNote;
   const canAddToFavorites = entry.category === 'Workout' && Boolean(onAddToFavorites);
 
   async function handleSubmit() {
@@ -63,13 +106,10 @@ export default function EntryDetailModal({
         difficulty,
         rpe,
         stats,
+        noteAction,
+        noteIndex: noteAction === 'update' ? selectedNoteIndex : undefined,
       });
-      setNoteInput('');
-      setActualDuration('');
-      setFreshness('');
-      setDifficulty('');
-      setRpe('');
-      setStats('');
+      startNewNote();
       setSubmitMessage({ type: 'success', text: 'Note submitted!' });
     } catch (error) {
       setSubmitMessage({
@@ -146,13 +186,66 @@ export default function EntryDetailModal({
           <div className="entry-detail-athlete-notes">
             <strong>My Notes:</strong>
             {entry.athleteNotes.map((note, index) => (
-              <blockquote key={index}>{note}</blockquote>
+              <div className="entry-detail-athlete-note" key={`${index}-${note.slice(0, 24)}`}>
+                <blockquote>{note}</blockquote>
+                {onSubmitNote && (
+                  <button
+                    type="button"
+                    className="entry-detail-edit-note"
+                    onClick={() => loadNoteForEditing(index)}
+                    disabled={submitting}
+                  >
+                    Edit note {index + 1}
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         )}
 
         {onSubmitNote && (
           <div className="entry-detail-note-form">
+            {hasExistingNotes && (
+              <div className="entry-detail-note-mode" role="group" aria-label="Note action">
+                <button
+                  type="button"
+                  className={noteAction === 'append' ? 'active' : ''}
+                  aria-pressed={noteAction === 'append'}
+                  onClick={startNewNote}
+                  disabled={submitting}
+                >
+                  Add Note
+                </button>
+                <button
+                  type="button"
+                  className={noteAction === 'update' ? 'active' : ''}
+                  aria-pressed={noteAction === 'update'}
+                  onClick={() => loadNoteForEditing(Math.min(selectedNoteIndex, entry.athleteNotes.length - 1))}
+                  disabled={submitting}
+                >
+                  Update Note
+                </button>
+              </div>
+            )}
+
+            {noteAction === 'update' && hasExistingNotes && (
+              <div className="entry-detail-field entry-detail-existing-note-select">
+                <label htmlFor="entry-existing-note">Existing Note</label>
+                <select
+                  id="entry-existing-note"
+                  value={selectedNoteIndex}
+                  onChange={event => loadNoteForEditing(Number(event.target.value))}
+                  disabled={submitting}
+                >
+                  {entry.athleteNotes.map((note, index) => (
+                    <option key={`${index}-${note.slice(0, 24)}`} value={index}>
+                      {getNoteOptionLabel(note, index)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <label htmlFor="entry-note-input">Your Notes:</label>
             <textarea
               id="entry-note-input"
