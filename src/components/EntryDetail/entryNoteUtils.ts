@@ -133,6 +133,14 @@ export function buildAthleteNoteRequest(
   if (payload.noteAction === 'update' && payload.noteIndex !== undefined) {
     noteOptions.noteIndex = payload.noteIndex;
   }
+  if (payload.noteAction === 'delete' && payload.noteIndex !== undefined) {
+    noteOptions.noteIndex = payload.noteIndex;
+    return {
+      noteToSend: undefined,
+      metadata: undefined,
+      noteOptions,
+    }
+  }
 
   return {
     noteToSend: trimmedNote || (shouldUseFallbackNote

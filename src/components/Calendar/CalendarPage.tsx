@@ -390,7 +390,7 @@ export default function CalendarPage() {
     if (!noteEntry) return;
     const { noteToSend, metadata, noteOptions } = buildAthleteNoteRequest(noteEntry, payload);
 
-    if (!noteToSend && !metadata) {
+    if (!noteToSend && !metadata && noteOptions.action !== 'delete') {
       return;
     }
 

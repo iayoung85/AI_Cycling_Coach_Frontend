@@ -105,7 +105,7 @@ export interface AthleteNoteMetadata {
   stats?: string;
 }
 
-export type AthleteNoteAction = 'append' | 'update' | 'upsert';
+export type AthleteNoteAction = 'append' | 'update' | 'upsert' | 'delete';
 
 export interface AthleteNoteOptions {
   action?: AthleteNoteAction;

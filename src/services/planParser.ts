@@ -297,6 +297,7 @@ export function parsePlanFile(raw: string, filename: string): PlanWeek {
         if (l.match(/^>\s*\[!NOTE\]/i)) {
           i++;
           let noteContent = '';
+          let splitNotes: string[] = [];
           while (i < lines.length) {
             const noteLine = lines[i];
 
@@ -323,7 +324,8 @@ export function parsePlanFile(raw: string, filename: string): PlanWeek {
             noteContent += noteLine + '\n';
             i++;
           }
-          athleteNotes.push(noteContent.trim());
+          splitNotes = noteContent.split(/\[!NOTE\]/i).map(n => n.trim()).filter(Boolean);
+          athleteNotes.push(...splitNotes);
           continue;
         }
 

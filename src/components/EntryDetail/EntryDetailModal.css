@@ -81,6 +81,13 @@
   margin-bottom: var(--space-md);
 }
 
+.note-action-buttons-row {
+  display: flex;
+  gap: var(--space-sm, 12px); /* Pushes the buttons safely apart */
+  align-items: center;
+  margin-top: var(--space-xs, 8px);
+}
+
 .entry-detail-edit-note {
   border: 0;
   background: transparent;
@@ -89,6 +96,31 @@
   font-weight: 600;
   padding: var(--space-xs) 0;
   cursor: pointer;
+}
+.entry-detail-delete-note {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  background-color: rgba(239, 68, 68, 0.1); /* Soft red tint */
+  color: #ef4444; /* Clean red text */
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+/* On hover, invert the colors cleanly using standard CSS properties */
+.entry-detail-delete-note:hover {
+  background-color: #ef4444; /* Solid red background */
+  color: #ffffff; /* Crisp white text */
+}
+
+.entry-detail-delete-note:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .entry-detail-edit-note:disabled {

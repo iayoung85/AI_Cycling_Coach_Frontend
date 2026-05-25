@@ -142,6 +142,35 @@ export default function EntryDetailModal({
     }
   }
 
+  async function handleDeleteNote(index: number) {
+    if (!onSubmitNote) return;
+
+    setSubmitting(true);
+    setSubmitMessage(null);
+
+    try {
+      await onSubmitNote({
+        note: '',
+        actualDuration: '',
+        freshness: '',
+        difficulty: '',
+        rpe: '',
+        stats: '',
+        noteAction: 'delete',
+        noteIndex: index,
+      });
+      startNewNote();
+      setSubmitMessage({ type: 'success', text: 'Note deleted successfully.' });
+    } catch (error) {
+      setSubmitMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Failed to delete note',
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <div className="entry-detail-overlay" onClick={onClose}>
       <div className="entry-detail-modal" onClick={event => event.stopPropagation()}>
@@ -182,23 +211,38 @@ export default function EntryDetailModal({
           </div>
         )}
 
-        {entry.athleteNotes.length > 0 && (
+        {entry.athleteNotes.filter(note => note.trim() !== '').length > 0 && (
           <div className="entry-detail-athlete-notes">
             <strong>My Notes:</strong>
-            {entry.athleteNotes.map((note, index) => (
-              <div className="entry-detail-athlete-note" key={`${index}-${note.slice(0, 24)}`}>
-                <blockquote>{note}</blockquote>
-                {onSubmitNote && (
-                  <button
-                    type="button"
-                    className="entry-detail-edit-note"
-                    onClick={() => loadNoteForEditing(index)}
-                    disabled={submitting}
-                  >
-                    Edit note {index + 1}
-                  </button>
-                )}
-              </div>
+            {entry.athleteNotes
+              .filter(note => note.trim() !== '')
+              .map((note, index) => (
+                <div className="entry-detail-athlete-note" key={`${index}-${note.slice(0, 24)}`}>
+                  <blockquote>{note}</blockquote>
+                  <div className="note-action-buttons-row">
+                    {onSubmitNote && (
+                      <button
+                        type="button"
+                        className="entry-detail-edit-note"
+                        onClick={() => loadNoteForEditing(index)}
+                        disabled={submitting}
+                      >
+                        Edit note {index + 1}
+                      </button>
+                    )}
+                    {onSubmitNote && (
+                      <button
+                        type="button"
+                        className="entry-detail-delete-note btn-danger"
+                        onClick={() => handleDeleteNote(index)}
+                        disabled={submitting}
+                        aria-label={`Delete note ${index + 1}`}
+                      >
+                        Delete 🗑️
+                      </button>
+                    )}
+                  </div>
+                </div>
             ))}
           </div>
         )}
